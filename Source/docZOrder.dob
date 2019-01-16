@@ -1,0 +1,598 @@
+VERSION 5.00
+Begin VB.UserDocument docZOrder 
+   ClientHeight    =   2850
+   ClientLeft      =   0
+   ClientTop       =   0
+   ClientWidth     =   2085
+   HScrollSmallChange=   225
+   ScaleHeight     =   2850
+   ScaleWidth      =   2085
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin VB.CommandButton cmdBack 
+      Height          =   330
+      Left            =   375
+      MaskColor       =   &H00000080&
+      Picture         =   "docZOrder.dox":0000
+      Style           =   1  'Graphical
+      TabIndex        =   3
+      TabStop         =   0   'False
+      ToolTipText     =   "Send To Back"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdFront 
+      Height          =   330
+      Left            =   45
+      MaskColor       =   &H00000080&
+      Picture         =   "docZOrder.dox":0102
+      Style           =   1  'Graphical
+      TabIndex        =   2
+      TabStop         =   0   'False
+      ToolTipText     =   "Bring To Front"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdRefresh 
+      Height          =   330
+      Left            =   705
+      MaskColor       =   &H00000080&
+      Picture         =   "docZOrder.dox":0204
+      Style           =   1  'Graphical
+      TabIndex        =   1
+      TabStop         =   0   'False
+      ToolTipText     =   "Refresh"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.ListBox lstControls 
+      DragIcon        =   "docZOrder.dox":0306
+      Height          =   2400
+      Left            =   30
+      Sorted          =   -1  'True
+      TabIndex        =   0
+      Top             =   360
+      Width           =   2025
+   End
+End
+Attribute VB_Name = "docZOrder"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'*******************************************************************************
+' MODULE:       docZOrder
+' FILENAME:     C:\My Code\vb\vbch\Source\docZOrder.dob
+' AUTHOR:       Phil Fresle
+' CREATED:      02-Jul-2001
+' COPYRIGHT:    Copyright 2001 Frez Systems Limited. All Rights Reserved.
+'
+' DESCRIPTION:
+' ZOrder
+'
+' MODIFICATION HISTORY:
+' 1.0       03-Jul-2001
+'           Phil Fresle
+'           Initial Version
+'*******************************************************************************
+Option Explicit
+
+Private m_VBInst        As VBIDE.VBE
+Private m_CurrentForm   As VBComponent
+Private m_Controls      As VBControls
+Private m_lMinWidth     As Long
+Private m_lMinWidth1    As Long
+
+Private Const NEWFORM       As Long = 0
+Private Const REFRESHCTLS   As Long = 3
+
+Private Const MODULE_NAME As String = "docTabOrder"
+
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" _
+    (ByVal hwnd As Long, _
+     ByVal wMsg As Long, _
+     ByVal wParam As Long, _
+     lParam As Any) As Long
+
+Private Const LB_SETTABSTOPS As Long = &H192
+Private Const LB_SETHORIZONTALEXTENT    As Long = &H194
+
+'*******************************************************************************
+' cmdBack_Click (SUB)
+'*******************************************************************************
+Private Sub cmdBack_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim sName           As String
+    Dim sFullName       As String
+    Dim lIndex          As Long
+    Dim lPos            As Long
+    Dim sListItem       As String
+    Dim sControls()     As String
+    Dim lCount          As Long
+    
+    Const PROCEDURE_NAME As String = "cmdFront_Click"
+    
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    If lstControls.ListIndex <> -1 Then
+        sListItem = lstControls.List(lstControls.ListIndex)
+        
+        lPos = InStr(sListItem, vbTab)
+        
+        If lPos > 0 Then
+            sListItem = Left(sListItem, lPos - 1)
+        End If
+
+        sControls = Split(sListItem, ".")
+        
+        For lCount = LBound(sControls) To UBound(sControls)
+            sFullName = Trim(sControls(lCount))
+            
+            If sFullName <> "" Then
+                lPos = InStr(sFullName, "(")
+                
+                If lPos > 0 Then
+                    sName = Left(sFullName, lPos - 1)
+                    lIndex = Val(Mid(sFullName, lPos + 1, InStr(sFullName, ")") - lPos - 1))
+                    m_CurrentForm.Designer.VBControls.Item(sName, lIndex).ZOrder 1
+                Else
+                    sName = sFullName
+                    m_CurrentForm.Designer.VBControls.Item(sName).ZOrder 1
+                End If
+            End If
+        Next
+    End If
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdFront_Click (SUB)
+'*******************************************************************************
+Private Sub cmdFront_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim sName           As String
+    Dim sFullName       As String
+    Dim lIndex          As Long
+    Dim lPos            As Long
+    Dim sListItem       As String
+    Dim sControls()     As String
+    Dim lCount          As Long
+    
+    Const PROCEDURE_NAME As String = "cmdFront_Click"
+    
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    If lstControls.ListIndex <> -1 Then
+        sListItem = lstControls.List(lstControls.ListIndex)
+        
+        lPos = InStr(sListItem, vbTab)
+        
+        If lPos > 0 Then
+            sListItem = Left(sListItem, lPos - 1)
+        End If
+
+        sControls = Split(sListItem, ".")
+        
+        For lCount = LBound(sControls) To UBound(sControls)
+            sFullName = Trim(sControls(lCount))
+            
+            If sFullName <> "" Then
+                lPos = InStr(sFullName, "(")
+                
+                If lPos > 0 Then
+                    sName = Left(sFullName, lPos - 1)
+                    lIndex = Val(Mid(sFullName, lPos + 1, InStr(sFullName, ")") - lPos - 1))
+                    m_CurrentForm.Designer.VBControls.Item(sName, lIndex).ZOrder 0
+                Else
+                    sName = sFullName
+                    m_CurrentForm.Designer.VBControls.Item(sName).ZOrder 0
+                End If
+            End If
+        Next
+    End If
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdRefresh_Click (SUB)
+'*******************************************************************************
+Private Sub cmdRefresh_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+
+    Const PROCEDURE_NAME As String = "cmdRefresh_Click"
+
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    RefreshList REFRESHCTLS
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' ControlAdded (SUB)
+'*******************************************************************************
+Public Sub ControlAdded(ctl As VBControl)
+'VBCH    Dim lCount As Long
+
+    On Error Resume Next
+
+    lstControls.AddItem ControlName(ctl)
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ControlName (FUNCTION)
+'*******************************************************************************
+Private Function ControlName(ctl As VBIDE.VBControl) As String
+    Dim sTemp       As String
+    Dim sCaption    As String
+    Dim lIndex      As Long
+    Dim sName       As String
+    Dim oTemp       As VBIDE.VBControl
+    Dim bDone       As Boolean
+    
+    On Error Resume Next
+    
+    Set oTemp = ctl
+    bDone = False
+    sTemp = ""
+    
+    Do
+        sName = oTemp.Properties("Name")
+        lIndex = oTemp.Properties("Index")
+        
+        If sTemp = "" Then
+            If lIndex >= 0 Then
+                sTemp = sName & "(" & lIndex & ")"
+            Else
+                sTemp = sName
+            End If
+        Else
+            If lIndex >= 0 Then
+                sTemp = sName & "(" & lIndex & ")." & sTemp
+            Else
+                sTemp = sName & "." & sTemp
+            End If
+        End If
+            
+        If TypeOf oTemp.Container Is VBControl Then
+            Set oTemp = oTemp.Container
+        Else
+            bDone = True
+        End If
+    Loop Until bDone
+
+    If TextWidth(sTemp & "WWW") > m_lMinWidth Then
+        m_lMinWidth = TextWidth(sTemp & "WWW")
+    End If
+
+    sCaption = ctl.Properties("Caption")
+    If sCaption = "" Then
+        sCaption = ctl.Properties("Text")
+    End If
+
+    If TextWidth(sCaption & "WWW") > m_lMinWidth1 Then
+        m_lMinWidth1 = TextWidth(sCaption & "WWW")
+    End If
+
+    If Len(sCaption) > 0 Then
+'        ControlName = sTemp & " - '" & sCaption & "'"
+        ControlName = sTemp & vbTab & "'" & sCaption & "'"
+    Else
+        ControlName = sTemp
+    End If
+
+    Err.Clear
+End Function
+
+'*******************************************************************************
+' ControlRemoved (SUB)
+'*******************************************************************************
+Public Sub ControlRemoved(ctl As VBControl)
+    Dim sTemp   As String
+    Dim lCount  As Long
+
+    On Error Resume Next
+
+    sTemp = ControlName(ctl)
+    For lCount = 0 To lstControls.ListCount - 1
+        If lstControls.List(lCount) = sTemp Then
+            lstControls.RemoveItem lCount
+            Exit Sub
+        End If
+    Next
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ControlRenamed (SUB)
+'*******************************************************************************
+Public Sub ControlRenamed(ctl As VBControl, sOldName As String, lOldIndex As Long)
+    Dim sTemp   As String
+    Dim lCount  As Long
+
+    On Error Resume Next
+
+    If lOldIndex >= 0 Then
+        sOldName = sOldName & "(" & lOldIndex & ")"
+    End If
+
+    sTemp = ControlName(ctl)
+
+    For lCount = 0 To lstControls.ListCount - 1
+        If Left(lstControls.List(lCount), Len(sOldName)) = sOldName Then
+            lstControls.RemoveItem lCount
+            lstControls.AddItem sTemp, lCount
+            Exit Sub
+        End If
+    Next
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' GetNameAndIndex (SUB)
+'*******************************************************************************
+Private Sub GetNameAndIndex(sListItem As String, sName As String, lIndex As Long)
+    Dim lPos    As Long
+    Dim lPos2   As Long
+    Dim sTemp   As String
+
+    On Error Resume Next
+
+'    lPos = InStr(sListItem, " ")
+    lPos = InStr(sListItem, vbTab)
+    If lPos > 0 Then
+        sTemp = Left(sListItem, lPos - 1)
+    Else
+        sTemp = sListItem
+    End If
+
+    lPos = InStr(sTemp, "(")
+    If lPos > 0 Then
+        lPos2 = InStr(sTemp, ")")
+        lIndex = Val(Mid(sTemp, lPos + 1, lPos2 - lPos))
+        sName = Left(sTemp, lPos - 1)
+    Else
+        lIndex = -1
+        sName = sTemp
+    End If
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' RefreshList (SUB)
+'*******************************************************************************
+Public Sub RefreshList(iType As Integer)
+'VBCH    Dim lCount          As Long
+    Dim oControl        As VBControl
+    Dim sTemp           As String
+'VBCH    Dim lTabIndex       As Long
+'VBCH    Dim sName           As String
+'VBCH    Dim lArrayIndex     As Long
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+'VBCH    Dim lWidth          As Long
+
+    Const PROCEDURE_NAME As String = "RefreshList"
+
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+
+    lstControls.Clear
+
+    If m_VBInst.ActiveVBProject Is Nothing Then
+        Exit Sub
+    End If
+
+    If iType = NEWFORM Then
+        If m_CurrentForm Is m_VBInst.SelectedVBComponent Then
+            Exit Sub
+        End If
+    End If
+
+    Set m_CurrentForm = m_VBInst.SelectedVBComponent
+
+    If m_CurrentForm Is Nothing Then
+        Exit Sub
+    End If
+
+    If (m_CurrentForm.Type <> vbext_ct_VBForm) And _
+            (m_CurrentForm.Type <> vbext_ct_UserControl) And _
+            (m_CurrentForm.Type <> vbext_ct_DocObject) And _
+            (m_CurrentForm.Type <> vbext_ct_PropPage) Then
+        Exit Sub
+    End If
+
+    Set m_Controls = m_CurrentForm.Designer.VBControls
+
+    m_lMinWidth = 0
+    m_lMinWidth1 = 0
+
+    For Each oControl In m_CurrentForm.Designer.VBControls
+        sTemp = ControlName(oControl)
+
+        lstControls.AddItem sTemp
+    Next
+    lstControls.Refresh
+
+    If m_lMinWidth <> 0 Then
+        SetListTabs
+    End If
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' SetListTabs (SUB)
+'*******************************************************************************
+Private Sub SetListTabs()
+    Dim lListBoxTabs(0) As Long
+    Dim lResult         As Long
+    Dim dAverageWidth   As Double
+    Dim lMaxWidth       As Long
+
+    Const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    On Error Resume Next
+
+    dAverageWidth = ((TextWidth(alphabet) / 52) / Screen.TwipsPerPixelX)
+
+    'Set the tab stop points.
+    lListBoxTabs(0) = ((m_lMinWidth / Screen.TwipsPerPixelX) / dAverageWidth) * 4
+
+    'Send LB_SETTABSTOPS message to ListBox.
+    lResult = SendMessage(lstControls.hwnd, LB_SETTABSTOPS, _
+        UBound(lListBoxTabs) + 1, _
+        lListBoxTabs(0))
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+    
+    lMaxWidth = (m_lMinWidth + m_lMinWidth1) \ Screen.TwipsPerPixelX
+    
+    lResult = SendMessage(lstControls.hwnd, LB_SETHORIZONTALEXTENT, _
+        lMaxWidth, 0&)
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+End Sub
+
+'*******************************************************************************
+' UserDocument_KeyDown (SUB)
+'*******************************************************************************
+Private Sub UserDocument_KeyDown(KeyCode As Integer, Shift As Integer)
+    On Error Resume Next
+
+    HandleKeyDown m_VBInst, Me, KeyCode, Shift
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Paint (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Paint()
+    Static s_dWidth  As Double
+    Static s_dHeight As Double
+    Static dWidth  As Double
+    Static dHeight As Double
+    
+    On Error Resume Next
+    
+    dWidth = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    dHeight = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+    
+    If dWidth <> s_dWidth And dHeight <> s_dHeight Then
+        s_dWidth = dWidth
+        s_dHeight = dHeight
+        lstControls.Width = dWidth
+        lstControls.Height = dHeight
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Resize (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Resize()
+    On Error Resume Next
+
+    lstControls.Width = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    lstControls.Height = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Show (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Show()
+    On Error Resume Next
+
+    cmdFront.ToolTipText = "Bring to Front"
+    cmdBack.ToolTipText = "Send to Back"
+    cmdRefresh.ToolTipText = "Refresh list"
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' VBInst (PROPERTY SET)
+'*******************************************************************************
+Public Property Set VBInst(oNewValue As Object)
+    Set m_VBInst = oNewValue
+End Property

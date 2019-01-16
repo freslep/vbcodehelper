@@ -1,0 +1,13 @@
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit %PROCTYPEMAIN%
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP

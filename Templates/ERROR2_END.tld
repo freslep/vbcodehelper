@@ -1,0 +1,13 @@
+Exit %PROCTYPEMAIN%
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit %PROCTYPEMAIN%
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP

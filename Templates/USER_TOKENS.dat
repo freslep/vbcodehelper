@@ -1,0 +1,5 @@
+' User tokens are added in the format %TAG%;prompt;value
+' If no prompt is provided it will just do a simple substitution for the value
+' If a prompt is provided when VBCodeHelper finds the user tag the user will
+' receive a prompt for the value to use along with the value as default.
+%DEPT%;Enter department name;IT Department

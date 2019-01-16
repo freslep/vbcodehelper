@@ -1,0 +1,1 @@
+Private Const MODULE_NAME As String = "%MODULE%"

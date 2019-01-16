@@ -1,0 +1,7 @@
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "%PROCNAME%%PROPERTYTYPE%"
+    
+    On Error GoTo ERROR_HANDLER

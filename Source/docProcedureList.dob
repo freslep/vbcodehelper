@@ -1,0 +1,1228 @@
+VERSION 5.00
+Begin VB.UserDocument docProcedureList 
+   ClientHeight    =   2460
+   ClientLeft      =   0
+   ClientTop       =   0
+   ClientWidth     =   2085
+   HScrollSmallChange=   225
+   KeyPreview      =   -1  'True
+   ScaleHeight     =   2460
+   ScaleWidth      =   2085
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin VB.CommandButton cmdOK 
+      Height          =   330
+      Left            =   1695
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":0000
+      Style           =   1  'Graphical
+      TabIndex        =   6
+      TabStop         =   0   'False
+      ToolTipText     =   "Apply Changes"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdUp 
+      Height          =   330
+      Left            =   705
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":0102
+      Style           =   1  'Graphical
+      TabIndex        =   3
+      TabStop         =   0   'False
+      ToolTipText     =   "Move Procedure Up"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdSort 
+      Height          =   330
+      Left            =   1365
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":0204
+      Style           =   1  'Graphical
+      TabIndex        =   5
+      TabStop         =   0   'False
+      ToolTipText     =   "Sort Ascending"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdRefresh 
+      Height          =   330
+      Left            =   375
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":0306
+      Style           =   1  'Graphical
+      TabIndex        =   2
+      TabStop         =   0   'False
+      ToolTipText     =   "Refresh"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdZoom 
+      Height          =   330
+      Left            =   45
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":0408
+      Style           =   1  'Graphical
+      TabIndex        =   1
+      TabStop         =   0   'False
+      ToolTipText     =   "Jump To Procedure"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdDown 
+      Height          =   330
+      Left            =   1035
+      MaskColor       =   &H00000080&
+      Picture         =   "docProcedureList.dox":050A
+      Style           =   1  'Graphical
+      TabIndex        =   4
+      TabStop         =   0   'False
+      ToolTipText     =   "Move Procedure Down"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.ListBox lstProcedures 
+      DragIcon        =   "docProcedureList.dox":060C
+      Height          =   2010
+      Left            =   30
+      MultiSelect     =   2  'Extended
+      TabIndex        =   0
+      Top             =   360
+      Width           =   1965
+   End
+End
+Attribute VB_Name = "docProcedureList"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'*******************************************************************************
+' MODULE:       docProcedureList
+' FILENAME:     C:\My Code\vb\vbch\Source\docProcedureList.dob
+' AUTHOR:       Phil Fresle
+' CREATED:      15-Oct-2001
+' COPYRIGHT:    Copyright 2001 Frez Systems Limited. All Rights Reserved.
+'
+' DESCRIPTION:
+' Procedure list
+'
+' MODIFICATION HISTORY:
+' 1.0       15-Oct-2001
+'           Phil Fresle
+'           Initial Version
+'*******************************************************************************
+Option Explicit
+
+Private m_VBInst                    As VBIDE.VBE
+Private m_lMinWidth1                As Long
+Private m_lMinWidth2                As Long
+Private m_lMinWidth3                As Long
+Private m_lMinWidth4                As Long
+Private m_lMinWidth5                As Long
+Private m_sProcedures()             As String
+Private m_lProcCount                As Long
+Private m_sName                     As String
+Private m_bDocumentBeforeProcedure  As Boolean
+
+Private Const PROC_PROPS    As Long = 17
+
+Private Const NEWFORM       As Long = 0
+Private Const TOPTOBOTTOM   As Long = 1
+Private Const LEFTTORIGHT   As Long = 2
+Private Const REFRESHCTLS   As Long = 3
+
+Private Const TYPE_LET      As String = "Property Let"
+Private Const TYPE_SET      As String = "Property Set"
+Private Const TYPE_GET      As String = "Property Get"
+Private Const TYPE_SUB      As String = "Sub"
+Private Const TYPE_FUNCTION As String = "Function"
+
+Private Const MODULE_NAME As String = "docProcedureList"
+
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" _
+    (ByVal hwnd As Long, _
+     ByVal wMsg As Long, _
+     ByVal wParam As Long, _
+     lParam As Any) As Long
+
+Private Const LB_SETTABSTOPS As Long = &H192
+Private Const LB_SETHORIZONTALEXTENT    As Long = &H194
+
+'*******************************************************************************
+' cmdDown_Click (SUB)
+'*******************************************************************************
+Private Sub cmdDown_Click()
+'VBCH    Dim lItem       As Long
+    Dim lCount      As Long
+    Dim bSelected() As Boolean
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    With lstProcedures
+        If .SelCount = 0 Then
+            Exit Sub
+        End If
+        
+        If .Selected(0) Then
+            Exit Sub
+        End If
+        
+        If .Selected(.ListCount - 1) Then
+            Exit Sub
+        End If
+        
+        ReDim bSelected(.ListCount - 1)
+        
+        For lCount = 0 To .ListCount - 1
+            bSelected(lCount) = .Selected(lCount)
+        Next
+        
+        For lCount = .ListCount - 1 To 0 Step -1
+            If bSelected(lCount) Then
+                lData = .ItemData(lCount)
+                .AddItem .List(lCount), lCount + 2
+                .ItemData(.NewIndex) = lData
+                .RemoveItem lCount
+            End If
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            .Selected(lCount) = False
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                .Selected(lCount + 1) = True
+            End If
+        Next
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' cmdOK_Click (SUB)
+'*******************************************************************************
+Private Sub cmdOK_Click()
+    Dim lCount          As Long
+    Dim sName           As String
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim bDirty          As Boolean
+    Dim oProject        As VBProject
+    Dim lReply          As Long
+    Dim lData           As Long
+    Dim sType           As String
+    Dim lLineNumber     As Long
+    Dim lStartLine      As Long
+    Dim lLineCount      As Long
+    Dim sOutput         As String
+    Dim sOriginal       As String
+    Dim bStarted        As Boolean
+    Dim oMember         As Member
+    
+    Const PROCEDURE_NAME As String = "cmdOK_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    bStarted = False
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    If m_lProcCount <= 0 Then
+        Exit Sub
+    End If
+    
+    sOutput = ""
+    
+    bDirty = False
+    For Each oProject In m_VBInst.VBProjects
+        If oProject.IsDirty Then
+            bDirty = True
+            Exit For
+        End If
+    Next
+    
+    If bDirty Then
+        lReply = MsgBox("It is recommended that you save the project(s) before" & _
+            " re-ordering procedures, do you want to continue anyway?", _
+            vbQuestion + vbYesNo, App.ProductName)
+        If lReply = vbNo Then
+            Exit Sub
+        End If
+    End If
+    
+    lReply = MsgBox("WARNING: This function will result in the loss of procedure attributes such as whether" & _
+        " the procedure is the default and the description that will appear in the object browser," & _
+        " do you want to continue anyway?", _
+        vbQuestion + vbYesNo, App.ProductName)
+    If lReply = vbNo Then
+        Exit Sub
+    End If
+    
+    Screen.MousePointer = vbHourglass
+    
+    If m_VBInst.ActiveCodePane.CodeModule.CountOfLines > 0 Then
+        sOriginal = m_VBInst.ActiveCodePane.CodeModule.Lines(1, m_VBInst.ActiveCodePane.CodeModule.CountOfLines)
+        
+        For lCount = 0 To lstProcedures.ListCount - 1
+            lData = lstProcedures.ItemData(lCount)
+            If lData >= 0 Then
+                sName = m_sProcedures(1, lData)
+                sType = m_sProcedures(3, lData)
+                
+                On Error Resume Next
+                Select Case sType
+                    Case TYPE_SUB, TYPE_FUNCTION
+                        lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Proc)
+                        If Err.Number <> 0 Then
+                            Err.Clear
+                            lLineNumber = -1
+                            lStartLine = -1
+                            lLineCount = -1
+                        Else
+                            lStartLine = m_VBInst.ActiveCodePane.CodeModule.ProcStartLine(sName, vbext_pk_Proc)
+                            lLineCount = m_VBInst.ActiveCodePane.CodeModule.ProcCountLines(sName, vbext_pk_Proc)
+                        End If
+                    Case TYPE_SET
+                        lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Set)
+                        If Err.Number <> 0 Then
+                            Err.Clear
+                            lLineNumber = -1
+                            lStartLine = -1
+                            lLineCount = -1
+                        Else
+                            lStartLine = m_VBInst.ActiveCodePane.CodeModule.ProcStartLine(sName, vbext_pk_Set)
+                            lLineCount = m_VBInst.ActiveCodePane.CodeModule.ProcCountLines(sName, vbext_pk_Set)
+                        End If
+                    Case TYPE_LET
+                        lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Let)
+                        If Err.Number <> 0 Then
+                            Err.Clear
+                            lLineNumber = -1
+                            lStartLine = -1
+                            lLineCount = -1
+                        Else
+                            lStartLine = m_VBInst.ActiveCodePane.CodeModule.ProcStartLine(sName, vbext_pk_Let)
+                            lLineCount = m_VBInst.ActiveCodePane.CodeModule.ProcCountLines(sName, vbext_pk_Let)
+                        End If
+                    Case TYPE_GET
+                        lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Get)
+                        If Err.Number <> 0 Then
+                            Err.Clear
+                            lLineNumber = -1
+                            lStartLine = -1
+                            lLineCount = -1
+                        Else
+                            lStartLine = m_VBInst.ActiveCodePane.CodeModule.ProcStartLine(sName, vbext_pk_Get)
+                            lLineCount = m_VBInst.ActiveCodePane.CodeModule.ProcCountLines(sName, vbext_pk_Get)
+                        End If
+                    Case Else
+                        lLineNumber = -1
+                        lStartLine = -1
+                        lLineCount = -1
+                End Select
+                On Error GoTo ERROR_HANDLER
+                
+                If lLineNumber > 0 And lStartLine > 0 And lLineCount > 0 Then
+                    If sOutput <> "" Then
+                        sOutput = sOutput & vbCrLf
+                    End If
+                    bStarted = True
+                    sOutput = sOutput & m_VBInst.ActiveCodePane.CodeModule.Lines(lStartLine, lLineCount)
+                    m_VBInst.ActiveCodePane.CodeModule.DeleteLines lStartLine, lLineCount
+                End If
+            End If
+        Next
+        
+        If m_VBInst.ActiveCodePane.CodeModule.CountOfLines > 0 Then
+            sOutput = m_VBInst.ActiveCodePane.CodeModule.Lines(1, m_VBInst.ActiveCodePane.CodeModule.CountOfLines) & _
+                vbCrLf & sOutput
+        End If
+        
+        If m_VBInst.ActiveCodePane.CodeModule.CountOfLines > 0 Then
+            m_VBInst.ActiveCodePane.CodeModule.DeleteLines 1, m_VBInst.ActiveCodePane.CodeModule.CountOfLines
+        End If
+        
+        m_VBInst.ActiveCodePane.CodeModule.InsertLines 1, sOutput
+        
+'        For Each oMember In m_VBInst.ActiveCodePane.CodeModule.Members
+'            For lCount = 0 To lstProcedures.ListCount - 1
+'                If UCase(m_sProcedures(1, lData)) = UCase(oMember.Name) Then
+'                    On Error Resume Next
+'                    oMember.Bindable = m_sProcedures(6, lData)
+'                    oMember.Hidden = m_sProcedures(7, lData)
+'                    oMember.Browsable = m_sProcedures(8, lData)
+'                    oMember.Category = m_sProcedures(9, lData)
+'                    oMember.DefaultBind = m_sProcedures(10, lData)
+'                    oMember.Description = m_sProcedures(11, lData)
+'                    oMember.DisplayBind = m_sProcedures(12, lData)
+'                    oMember.HelpContextID = m_sProcedures(13, lData)
+'                    oMember.PropertyPage = m_sProcedures(14, lData)
+'                    oMember.RequestEdit = m_sProcedures(15, lData)
+'                    oMember.StandardMethod = CLng(m_sProcedures(16, lData))
+'                    oMember.UIDefault = m_sProcedures(17, lData)
+'                    On Error GoTo ERROR_HANDLER
+'                End If
+'            Next
+'        Next
+        
+    End If
+    
+    bStarted = False
+    RefreshList
+    
+    Screen.MousePointer = vbDefault
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    Screen.MousePointer = vbDefault
+    
+    If lErrNumber <> 0 Then
+        ' If it failed mid-way through the operation, put back original contents
+        If bStarted Then
+            If m_VBInst.ActiveCodePane.CodeModule.CountOfLines > 0 Then
+                m_VBInst.ActiveCodePane.CodeModule.DeleteLines 1, m_VBInst.ActiveCodePane.CodeModule.CountOfLines
+            End If
+            
+            m_VBInst.ActiveCodePane.CodeModule.InsertLines 1, sOriginal
+        End If
+    
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdRefresh_Click (SUB)
+'*******************************************************************************
+Private Sub cmdRefresh_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdRefresh_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    RefreshList
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdSort_Click (SUB)
+'*******************************************************************************
+Private Sub cmdSort_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdSort_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    RealRefreshList True
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdUp_Click (SUB)
+'*******************************************************************************
+Private Sub cmdUp_Click()
+'VBCH    Dim lItem       As Long
+    Dim lCount      As Long
+    Dim bSelected() As Boolean
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    With lstProcedures
+    
+        If .SelCount = 0 Then
+            Exit Sub
+        End If
+        
+        If .Selected(0) Then
+            Exit Sub
+        End If
+        
+        If .Selected(1) Then
+            Exit Sub
+        End If
+        
+        ReDim bSelected(.ListCount - 1)
+        
+        For lCount = 0 To .ListCount - 1
+            bSelected(lCount) = .Selected(lCount)
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                lData = .ItemData(lCount)
+                .AddItem .List(lCount), lCount - 1
+                .ItemData(.NewIndex) = lData
+                .RemoveItem lCount + 1
+            End If
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            .Selected(lCount) = False
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                .Selected(lCount - 1) = True
+            End If
+        Next
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' cmdZoom_Click (SUB)
+'*******************************************************************************
+Private Sub cmdZoom_Click()
+    Dim lIndex      As Long
+    Dim lData       As Long
+    Dim sName       As String
+    Dim sType       As String
+    Dim lLineNumber As Long
+    
+    lIndex = lstProcedures.ListIndex
+    
+    If lIndex > 0 Then
+        lData = lstProcedures.ItemData(lIndex)
+        If lData >= 0 Then
+            sName = m_sProcedures(1, lData)
+            sType = m_sProcedures(3, lData)
+            
+            On Error Resume Next
+            Select Case sType
+                Case TYPE_SUB, TYPE_FUNCTION
+                    lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Proc)
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        lLineNumber = -1
+                    End If
+                Case TYPE_SET
+                    lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Set)
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        lLineNumber = -1
+                    End If
+                Case TYPE_LET
+                    lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Let)
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        lLineNumber = -1
+                    End If
+                Case TYPE_GET
+                    lLineNumber = m_VBInst.ActiveCodePane.CodeModule.ProcBodyLine(sName, vbext_pk_Get)
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        lLineNumber = -1
+                    End If
+                Case Else
+                    lLineNumber = -1
+            End Select
+            On Error GoTo 0
+            
+            If lLineNumber > 0 Then
+                m_VBInst.ActiveCodePane.CodeModule.CodePane.SetSelection lLineNumber, 1, lLineNumber, 1
+            End If
+        End If
+    End If
+End Sub
+
+'*******************************************************************************
+' lstProcedures_DragDrop (SUB)
+'*******************************************************************************
+Private Sub lstProcedures_DragDrop(Source As Control, x As Single, y As Single)
+    Dim lIndex      As Long
+    Dim sTemp       As String
+    Dim lPos        As Long
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    With lstProcedures
+        lIndex = .ListIndex
+        If lIndex >= 0 Then
+            sTemp = .Text
+            lPos = (y \ TextHeight(sTemp)) + .TopIndex
+
+            If lPos > .ListCount Then
+                lPos = .ListCount
+            End If
+
+            lData = .ItemData(lIndex)
+            .AddItem sTemp, lPos
+            .ItemData(.NewIndex) = lData
+
+            If lIndex > lPos Then
+                .RemoveItem lIndex + 1
+            Else
+                .RemoveItem lIndex
+            End If
+        End If
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' lstProcedures_MouseMove (SUB)
+'*******************************************************************************
+Private Sub lstProcedures_MouseMove(Button As Integer, Shift As Integer, x As Single, y As Single)
+    On Error Resume Next
+    
+    If lstProcedures.ListIndex > 0 Then
+        If Button = vbLeftButton And Shift = 0 Then
+            lstProcedures.Drag
+        End If
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ModuleName (PROPERTY GET)
+'*******************************************************************************
+Public Property Get ModuleName() As String
+    ModuleName = m_sName
+End Property
+
+'*******************************************************************************
+' RealRefreshList (SUB)
+'*******************************************************************************
+Private Sub RealRefreshList(bSort As Boolean)
+    Dim lCount          As Long
+    Dim sTemp           As String
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim oMember         As Member
+    Dim bProcedure      As Boolean
+    Dim sDeclaration    As String
+    Dim lLineNumber     As Long
+    Dim lTopLine        As Long
+    Dim eptType         As enumProcedureType
+    Dim sScope          As String
+    Dim lStartLine      As Long
+    Dim lLineCount      As Long
+    Dim sProcText       As String
+    Dim sCommentTest    As String
+    Dim lEndLine        As Long
+    Dim lEndDecLine     As Long
+    
+    Const PROCEDURE_NAME As String = "RealRefreshList"
+    
+    On Error GoTo ERROR_HANDLER
+
+    m_sName = ""
+
+    m_lProcCount = -1
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+
+    lstProcedures.Clear
+
+    If m_VBInst.ActiveVBProject Is Nothing Then
+        Exit Sub
+    End If
+
+    If m_VBInst.ActiveCodePane Is Nothing Then
+        MsgBox "A code pane must be selected first", _
+            vbCritical, App.ProductName
+    Else
+        m_lMinWidth1 = TextWidth("PROCEDURE NAMEWW")
+        m_lMinWidth2 = TextWidth("SCOPEWW")
+        m_lMinWidth3 = TextWidth("PROPERTY SETWW")
+        m_lMinWidth4 = TextWidth("DOCUMENTEDWW")
+        m_lMinWidth5 = TextWidth("ERROR HANDLERWW")
+        
+        With m_VBInst.ActiveCodePane.CodeModule
+            m_sName = .CodePane.Window.Caption
+        
+            ' Loop through procedures and properties
+            For Each oMember In .Members
+            
+                ' Document the method
+                If oMember.Type = vbext_mt_Method Then
+                
+                    ' Make sure it is not a 'Declare'
+                    bProcedure = False
+                    If .ProcBodyLine(oMember.Name, vbext_pk_Proc) = 1 And _
+                        .ProcStartLine(oMember.Name, vbext_pk_Proc) = 1 Then
+                        
+                        sDeclaration = " " & GetDeclarationLine(m_VBInst, 1, lEndLine)
+                        
+                        If (InStr(sDeclaration, " Sub " & oMember.Name) > 0 _
+                            Or InStr(sDeclaration, " Function " & oMember.Name) > 0) _
+                            And InStr(sDeclaration, " Declare ") = 0 Then
+                                bProcedure = True
+                        End If
+                    Else
+                        bProcedure = True
+                    End If
+                    
+                    If bProcedure Then
+                        lLineNumber = .ProcBodyLine(oMember.Name, vbext_pk_Proc)
+                        lStartLine = .ProcStartLine(oMember.Name, vbext_pk_Proc)
+                        lLineCount = .ProcCountLines(oMember.Name, vbext_pk_Proc)
+                        sProcText = .Lines(lStartLine, lLineCount)
+                        
+                        GetProcedureDetails m_VBInst, lLineNumber, oMember, eptType, lTopLine, lEndDecLine
+        
+                        If lTopLine <> 0 Then
+                            m_lProcCount = m_lProcCount + 1
+                            ReDim Preserve m_sProcedures(PROC_PROPS, m_lProcCount)
+                            
+                            m_sProcedures(0, m_lProcCount) = Right("0000000" & lLineNumber, 7)
+                            m_sProcedures(1, m_lProcCount) = oMember.Name
+                            sScope = TranslateScope(oMember.Scope)
+                            m_sProcedures(2, m_lProcCount) = sScope
+                            
+'                            m_sProcedures(6, m_lProcCount) = oMember.Bindable
+'                            m_sProcedures(7, m_lProcCount) = oMember.Hidden
+'                            m_sProcedures(8, m_lProcCount) = oMember.Browsable
+'                            m_sProcedures(9, m_lProcCount) = oMember.Category
+'                            m_sProcedures(10, m_lProcCount) = oMember.DefaultBind
+'                            m_sProcedures(11, m_lProcCount) = oMember.Description
+'                            m_sProcedures(12, m_lProcCount) = oMember.DisplayBind
+'                            m_sProcedures(13, m_lProcCount) = oMember.HelpContextID
+'                            m_sProcedures(14, m_lProcCount) = oMember.PropertyPage
+'                            m_sProcedures(15, m_lProcCount) = oMember.RequestEdit
+'                            m_sProcedures(16, m_lProcCount) = oMember.StandardMethod
+'                            m_sProcedures(17, m_lProcCount) = oMember.UIDefault
+                            
+                            If TextWidth(oMember.Name & "WW") > m_lMinWidth1 Then
+                                m_lMinWidth1 = TextWidth(oMember.Name & "WW")
+                            End If
+                            If TextWidth(sScope & "WW") > m_lMinWidth2 Then
+                                m_lMinWidth2 = TextWidth(sScope & "WW")
+                            End If
+                            
+                            Select Case eptType
+                                Case PTSub
+                                    m_sProcedures(3, m_lProcCount) = TYPE_SUB
+                                Case PTFunction
+                                    m_sProcedures(3, m_lProcCount) = TYPE_FUNCTION
+                                Case PTGet
+                                    m_sProcedures(3, m_lProcCount) = TYPE_GET
+                                Case PTLet
+                                    m_sProcedures(3, m_lProcCount) = TYPE_LET
+                                Case PTSet
+                                    m_sProcedures(3, m_lProcCount) = TYPE_SET
+                                Case Else
+                                    m_sProcedures(3, m_lProcCount) = ""
+                            End Select
+                            
+                            If m_bDocumentBeforeProcedure Then
+                                If lTopLine > 1 Then
+                                    sCommentTest = LTrim(.Lines(lTopLine - 1, 1))
+                                Else
+                                    sCommentTest = ""
+                                End If
+                            Else
+                                sCommentTest = LTrim(.Lines(lEndDecLine + 1, 1))
+                            End If
+                            If Left(sCommentTest, 1) = "'" Or Left(sCommentTest, 4) = "REM " Then
+                                m_sProcedures(4, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(4, m_lProcCount) = "No"
+                            End If
+                            
+                            If InStr(sProcText, "On Error ") > 0 Then
+                                m_sProcedures(5, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(5, m_lProcCount) = "No"
+                            End If
+                        End If
+                    End If
+                    
+                ' Document Let, Set and Get part of property if they exist
+                ElseIf oMember.Type = vbext_mt_Property Then
+                    On Error Resume Next
+                    Err.Clear
+                    
+                    lLineNumber = .ProcBodyLine(oMember.Name, vbext_pk_Get)
+                    
+                    If Err.Number = 0 Then
+                        lStartLine = .ProcStartLine(oMember.Name, vbext_pk_Get)
+                        lLineCount = .ProcCountLines(oMember.Name, vbext_pk_Get)
+                        sProcText = .Lines(lStartLine, lLineCount)
+                        
+                        GetProcedureDetails m_VBInst, lLineNumber, oMember, eptType, lTopLine, lEndDecLine
+                        If lTopLine <> 0 Then
+                            m_lProcCount = m_lProcCount + 1
+                            ReDim Preserve m_sProcedures(PROC_PROPS, m_lProcCount)
+                            
+                            m_sProcedures(0, m_lProcCount) = Right("0000000" & lLineNumber, 7)
+                            m_sProcedures(1, m_lProcCount) = oMember.Name
+                            sScope = TranslateScope(oMember.Scope)
+                            m_sProcedures(2, m_lProcCount) = sScope
+                            m_sProcedures(3, m_lProcCount) = TYPE_GET
+                            
+'                            m_sProcedures(6, m_lProcCount) = oMember.Bindable
+'                            m_sProcedures(7, m_lProcCount) = oMember.Hidden
+'                            m_sProcedures(8, m_lProcCount) = oMember.Browsable
+'                            m_sProcedures(9, m_lProcCount) = oMember.Category
+'                            m_sProcedures(10, m_lProcCount) = oMember.DefaultBind
+'                            m_sProcedures(11, m_lProcCount) = oMember.Description
+'                            m_sProcedures(12, m_lProcCount) = oMember.DisplayBind
+'                            m_sProcedures(13, m_lProcCount) = oMember.HelpContextID
+'                            m_sProcedures(14, m_lProcCount) = oMember.PropertyPage
+'                            m_sProcedures(15, m_lProcCount) = oMember.RequestEdit
+'                            m_sProcedures(16, m_lProcCount) = oMember.StandardMethod
+'                            m_sProcedures(17, m_lProcCount) = oMember.UIDefault
+                            
+                            If m_bDocumentBeforeProcedure Then
+                                If lTopLine > 1 Then
+                                    sCommentTest = LTrim(.Lines(lTopLine - 1, 1))
+                                Else
+                                    sCommentTest = ""
+                                End If
+                            Else
+                                sCommentTest = LTrim(.Lines(lEndDecLine + 1, 1))
+                            End If
+                            If Left(sCommentTest, 1) = "'" Or Left(sCommentTest, 4) = "REM " Then
+                                m_sProcedures(4, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(4, m_lProcCount) = "No"
+                            End If
+                            
+                            If InStr(sProcText, "On Error ") > 0 Then
+                                m_sProcedures(5, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(5, m_lProcCount) = "No"
+                            End If
+                        
+                            If TextWidth(oMember.Name & "WW") > m_lMinWidth1 Then
+                                m_lMinWidth1 = TextWidth(oMember.Name & "WW")
+                            End If
+                            If TextWidth(sScope & "WW") > m_lMinWidth2 Then
+                                m_lMinWidth2 = TextWidth(sScope & "WW")
+                            End If
+                        End If
+                    Else
+                        Err.Clear
+                    End If
+                    
+                    lLineNumber = .ProcBodyLine(oMember.Name, vbext_pk_Set)
+                    If Err.Number = 0 Then
+                        lStartLine = .ProcStartLine(oMember.Name, vbext_pk_Set)
+                        lLineCount = .ProcCountLines(oMember.Name, vbext_pk_Set)
+                        sProcText = .Lines(lStartLine, lLineCount)
+                        
+                        GetProcedureDetails m_VBInst, lLineNumber, oMember, eptType, lTopLine, lEndDecLine
+                        If lTopLine <> 0 Then
+                            m_lProcCount = m_lProcCount + 1
+                            ReDim Preserve m_sProcedures(PROC_PROPS, m_lProcCount)
+                            
+                            m_sProcedures(0, m_lProcCount) = Right("0000000" & lLineNumber, 7)
+                            m_sProcedures(1, m_lProcCount) = oMember.Name
+                            sScope = TranslateScope(oMember.Scope)
+                            m_sProcedures(2, m_lProcCount) = sScope
+                            m_sProcedures(3, m_lProcCount) = TYPE_SET
+                            
+'                            m_sProcedures(6, m_lProcCount) = oMember.Bindable
+'                            m_sProcedures(7, m_lProcCount) = oMember.Hidden
+'                            m_sProcedures(8, m_lProcCount) = oMember.Browsable
+'                            m_sProcedures(9, m_lProcCount) = oMember.Category
+'                            m_sProcedures(10, m_lProcCount) = oMember.DefaultBind
+'                            m_sProcedures(11, m_lProcCount) = oMember.Description
+'                            m_sProcedures(12, m_lProcCount) = oMember.DisplayBind
+'                            m_sProcedures(13, m_lProcCount) = oMember.HelpContextID
+'                            m_sProcedures(14, m_lProcCount) = oMember.PropertyPage
+'                            m_sProcedures(15, m_lProcCount) = oMember.RequestEdit
+'                            m_sProcedures(16, m_lProcCount) = oMember.StandardMethod
+'                            m_sProcedures(17, m_lProcCount) = oMember.UIDefault
+                                                        
+                            If m_bDocumentBeforeProcedure Then
+                                If lTopLine > 1 Then
+                                    sCommentTest = LTrim(.Lines(lTopLine - 1, 1))
+                                Else
+                                    sCommentTest = ""
+                                End If
+                            Else
+                                sCommentTest = LTrim(.Lines(lEndDecLine + 1, 1))
+                            End If
+                            If Left(sCommentTest, 1) = "'" Or Left(sCommentTest, 4) = "REM " Then
+                                m_sProcedures(4, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(4, m_lProcCount) = "No"
+                            End If
+                            
+                            If InStr(sProcText, "On Error ") > 0 Then
+                                m_sProcedures(5, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(5, m_lProcCount) = "No"
+                            End If
+                            
+                            If TextWidth(oMember.Name & "WW") > m_lMinWidth1 Then
+                                m_lMinWidth1 = TextWidth(oMember.Name & "WW")
+                            End If
+                            If TextWidth(sScope & "WW") > m_lMinWidth2 Then
+                                m_lMinWidth2 = TextWidth(sScope & "WW")
+                            End If
+                        End If
+                    Else
+                        Err.Clear
+                    End If
+                    
+                    lLineNumber = .ProcBodyLine(oMember.Name, vbext_pk_Let)
+                    If Err.Number = 0 Then
+                        lStartLine = .ProcStartLine(oMember.Name, vbext_pk_Let)
+                        lLineCount = .ProcCountLines(oMember.Name, vbext_pk_Let)
+                        sProcText = .Lines(lStartLine, lLineCount)
+                        
+                        GetProcedureDetails m_VBInst, lLineNumber, oMember, eptType, lTopLine, lEndDecLine
+                        If lTopLine <> 0 Then
+                            m_lProcCount = m_lProcCount + 1
+                            ReDim Preserve m_sProcedures(PROC_PROPS, m_lProcCount)
+                            
+                            m_sProcedures(0, m_lProcCount) = Right("0000000" & lLineNumber, 7)
+                            m_sProcedures(1, m_lProcCount) = oMember.Name
+                            sScope = TranslateScope(oMember.Scope)
+                            m_sProcedures(2, m_lProcCount) = sScope
+                            m_sProcedures(3, m_lProcCount) = TYPE_LET
+                            
+'                            m_sProcedures(6, m_lProcCount) = oMember.Bindable
+'                            m_sProcedures(7, m_lProcCount) = oMember.Hidden
+'                            m_sProcedures(8, m_lProcCount) = oMember.Browsable
+'                            m_sProcedures(9, m_lProcCount) = oMember.Category
+'                            m_sProcedures(10, m_lProcCount) = oMember.DefaultBind
+'                            m_sProcedures(11, m_lProcCount) = oMember.Description
+'                            m_sProcedures(12, m_lProcCount) = oMember.DisplayBind
+'                            m_sProcedures(13, m_lProcCount) = oMember.HelpContextID
+'                            m_sProcedures(14, m_lProcCount) = oMember.PropertyPage
+'                            m_sProcedures(15, m_lProcCount) = oMember.RequestEdit
+'                            m_sProcedures(16, m_lProcCount) = oMember.StandardMethod
+'                            m_sProcedures(17, m_lProcCount) = oMember.UIDefault
+                            
+                            If m_bDocumentBeforeProcedure Then
+                                If lTopLine > 1 Then
+                                    sCommentTest = LTrim(.Lines(lTopLine - 1, 1))
+                                Else
+                                    sCommentTest = ""
+                                End If
+                            Else
+                                sCommentTest = LTrim(.Lines(lEndDecLine + 1, 1))
+                            End If
+                            If Left(sCommentTest, 1) = "'" Or Left(sCommentTest, 4) = "REM " Then
+                                m_sProcedures(4, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(4, m_lProcCount) = "No"
+                            End If
+                            
+                            If InStr(sProcText, "On Error ") > 0 Then
+                                m_sProcedures(5, m_lProcCount) = "Yes"
+                            Else
+                                m_sProcedures(5, m_lProcCount) = "No"
+                            End If
+                        
+                            If TextWidth(oMember.Name & "WW") > m_lMinWidth1 Then
+                                m_lMinWidth1 = TextWidth(oMember.Name & "WW")
+                            End If
+                            If TextWidth(sScope & "WW") > m_lMinWidth2 Then
+                                m_lMinWidth2 = TextWidth(sScope & "WW")
+                            End If
+                        End If
+                    Else
+                        Err.Clear
+                    End If
+                    On Error GoTo ERROR_HANDLER
+                End If
+            Next
+        End With
+    End If
+    
+    If bSort Then
+        QuickSort2DStringsStart m_sProcedures, 1
+    Else
+        QuickSort2DStringsStart m_sProcedures, 0
+    End If
+    
+    sTemp = "PROCEDURE NAME" & vbTab & "SCOPE" & vbTab & "TYPE" & vbTab & "DOCUMENTED" & vbTab & "ERROR HANDLER"
+    lstProcedures.AddItem sTemp
+    lstProcedures.ItemData(lstProcedures.NewIndex) = -1
+    
+    For lCount = 0 To m_lProcCount
+        sTemp = m_sProcedures(1, lCount) & vbTab & _
+            m_sProcedures(2, lCount) & vbTab & _
+            m_sProcedures(3, lCount) & vbTab & _
+            m_sProcedures(4, lCount) & vbTab & _
+            m_sProcedures(5, lCount)
+        'add it to the list
+        lstProcedures.AddItem sTemp
+        lstProcedures.ItemData(lstProcedures.NewIndex) = lCount
+        lstProcedures.Refresh
+    Next
+    
+    SetListTabs
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' RefreshList (SUB)
+'*******************************************************************************
+Public Sub RefreshList()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "RefreshList"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    RealRefreshList False
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' SetListTabs (SUB)
+'*******************************************************************************
+Private Sub SetListTabs()
+    Dim lListBoxTabs(3) As Long
+    Dim lResult         As Long
+    Dim dAverageWidth   As Double
+    Dim lMaxWidth       As Long
+
+    Const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    On Error Resume Next
+
+    dAverageWidth = ((TextWidth(alphabet) / 52) / Screen.TwipsPerPixelX)
+
+    'Set the tab stop points.
+    lListBoxTabs(0) = ((m_lMinWidth1 / Screen.TwipsPerPixelX) / dAverageWidth) * 4
+    lListBoxTabs(1) = lListBoxTabs(0) + (((m_lMinWidth2 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(2) = lListBoxTabs(1) + (((m_lMinWidth3 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(3) = lListBoxTabs(2) + (((m_lMinWidth4 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+
+    'Send LB_SETTABSTOPS message to ListBox.
+    lResult = SendMessage(lstProcedures.hwnd, LB_SETTABSTOPS, _
+        UBound(lListBoxTabs) + 1, _
+        lListBoxTabs(0))
+
+    'Refresh the ListBox control.
+    lstProcedures.Refresh
+    
+    lMaxWidth = (m_lMinWidth1 + m_lMinWidth2 + m_lMinWidth3 + m_lMinWidth4 + m_lMinWidth5) / Screen.TwipsPerPixelX
+    
+    lResult = SendMessage(lstProcedures.hwnd, LB_SETHORIZONTALEXTENT, _
+        lMaxWidth, 0&)
+
+    'Refresh the ListBox control.
+    lstProcedures.Refresh
+End Sub
+
+'*******************************************************************************
+' TidyUp (SUB)
+'*******************************************************************************
+Public Sub TidyUp()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "TidyUp"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    lstProcedures.Clear
+    Set m_VBInst = Nothing
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' TranslateScope (FUNCTION)
+'*******************************************************************************
+Private Function TranslateScope(lScope As vbext_Scope) As String
+    Select Case lScope
+        Case vbext_Private
+            TranslateScope = "Private"
+        Case vbext_Public
+            TranslateScope = "Public"
+        Case vbext_Friend
+            TranslateScope = "Friend"
+        Case Else
+            TranslateScope = ""
+    End Select
+End Function
+
+'*******************************************************************************
+' UserDocument_KeyDown (SUB)
+'*******************************************************************************
+Private Sub UserDocument_KeyDown(KeyCode As Integer, Shift As Integer)
+    On Error Resume Next
+    
+    HandleKeyDown m_VBInst, Me, KeyCode, Shift
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Paint (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Paint()
+    Static s_dWidth  As Double
+    Static s_dHeight As Double
+    Static dWidth  As Double
+    Static dHeight As Double
+    
+    On Error Resume Next
+    
+    dWidth = UserDocument.ViewportWidth - (lstProcedures.Left * 2)
+    dHeight = UserDocument.ViewportHeight - (lstProcedures.Top + 50)
+    
+    If dWidth <> s_dWidth And dHeight <> s_dHeight Then
+        s_dWidth = dWidth
+        s_dHeight = dHeight
+        lstProcedures.Width = dWidth
+        lstProcedures.Height = dHeight
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Resize (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Resize()
+    On Error Resume Next
+
+    lstProcedures.Width = UserDocument.ViewportWidth - (lstProcedures.Left * 2)
+    lstProcedures.Height = UserDocument.ViewportHeight - (lstProcedures.Top + 50)
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Show (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Show()
+    On Error Resume Next
+    
+    cmdRefresh.ToolTipText = "Refresh list"
+    cmdUp.ToolTipText = "Move procedure up the procedure order"
+    cmdDown.ToolTipText = "Move procedure down the procedure order"
+    cmdSort.ToolTipText = "Sort procedures alphabetically"
+    cmdOK.ToolTipText = "Apply this procedure order"
+    cmdZoom.ToolTipText = "Jump to procedure"
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Terminate (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Terminate()
+    Set m_VBInst = Nothing
+End Sub
+
+'*******************************************************************************
+' VBInst (PROPERTY SET)
+'*******************************************************************************
+Public Property Set VBInst(oNewValue As Object)
+    Set m_VBInst = oNewValue
+End Property
+
+'*******************************************************************************
+' DocumentBeforeProcedure (PROPERTY LET)
+'*******************************************************************************
+Public Property Let DocumentBeforeProcedure(ByVal NewValue As Boolean)
+    m_bDocumentBeforeProcedure = NewValue
+End Property

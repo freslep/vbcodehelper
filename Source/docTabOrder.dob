@@ -1,0 +1,1125 @@
+VERSION 5.00
+Begin VB.UserDocument docTabOrder 
+   ClientHeight    =   2820
+   ClientLeft      =   0
+   ClientTop       =   0
+   ClientWidth     =   2085
+   HScrollSmallChange=   225
+   KeyPreview      =   -1  'True
+   ScaleHeight     =   2820
+   ScaleWidth      =   2085
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin VB.CheckBox chkGroup 
+      Caption         =   "Group by container"
+      Height          =   195
+      Left            =   120
+      TabIndex        =   7
+      TabStop         =   0   'False
+      Top             =   420
+      Value           =   1  'Checked
+      Width           =   1815
+   End
+   Begin VB.CommandButton cmdOK 
+      Height          =   330
+      Left            =   1695
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":0000
+      Style           =   1  'Graphical
+      TabIndex        =   6
+      TabStop         =   0   'False
+      ToolTipText     =   "Apply Changes"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdRefresh 
+      Height          =   330
+      Left            =   1365
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":0102
+      Style           =   1  'Graphical
+      TabIndex        =   5
+      TabStop         =   0   'False
+      ToolTipText     =   "Refresh"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdDownAcross 
+      Height          =   330
+      Left            =   705
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":0204
+      Style           =   1  'Graphical
+      TabIndex        =   3
+      TabStop         =   0   'False
+      ToolTipText     =   "Sort Down And Across"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdDown 
+      Height          =   330
+      Left            =   375
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":0306
+      Style           =   1  'Graphical
+      TabIndex        =   2
+      TabStop         =   0   'False
+      ToolTipText     =   "Move Control(s) Down List"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdUp 
+      Height          =   330
+      Left            =   45
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":0408
+      Style           =   1  'Graphical
+      TabIndex        =   1
+      TabStop         =   0   'False
+      ToolTipText     =   "Move Control(s) Up List"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdAcrossDown 
+      Height          =   330
+      Left            =   1035
+      MaskColor       =   &H00000080&
+      Picture         =   "docTabOrder.dox":050A
+      Style           =   1  'Graphical
+      TabIndex        =   4
+      TabStop         =   0   'False
+      ToolTipText     =   "Sort Across And Down"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.ListBox lstControls 
+      DragIcon        =   "docTabOrder.dox":060C
+      Height          =   2010
+      Left            =   30
+      MultiSelect     =   2  'Extended
+      TabIndex        =   0
+      Top             =   720
+      Width           =   2025
+   End
+End
+Attribute VB_Name = "docTabOrder"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'*******************************************************************************
+' MODULE:       docTabOrder
+' FILENAME:     C:\My Code\vb\vbch\Source\docTabOrder.dob
+' AUTHOR:       Phil Fresle
+' CREATED:      02-Jul-2001
+' COPYRIGHT:    Copyright 2001 Frez Systems Limited. All Rights Reserved.
+'
+' DESCRIPTION:
+' Tab order
+'
+' MODIFICATION HISTORY:
+' 1.0       03-Jul-2001
+'           Phil Fresle
+'           Initial Version
+'*******************************************************************************
+Option Explicit
+
+Private m_VBInst        As VBIDE.VBE
+Private m_CurrentForm   As VBComponent
+Private m_Controls      As VBControls
+Private m_lMinWidth     As Long
+Private m_lMinWidth1    As Long
+
+Private Const NEWFORM       As Long = 0
+Private Const TOPTOBOTTOM   As Long = 1
+Private Const LEFTTORIGHT   As Long = 2
+Private Const REFRESHCTLS   As Long = 3
+
+Private Const MODULE_NAME As String = "docTabOrder"
+
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" _
+    (ByVal hwnd As Long, _
+     ByVal wMsg As Long, _
+     ByVal wParam As Long, _
+     lParam As Any) As Long
+
+Private Const LB_SETTABSTOPS As Long = &H192
+Private Const LB_SETHORIZONTALEXTENT    As Long = &H194
+
+'*******************************************************************************
+' cmdAcrossDown_Click (SUB)
+'*******************************************************************************
+Private Sub cmdAcrossDown_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdAcrossDown_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    If chkGroup.value = vbChecked Then
+        NewSort True, True
+    Else
+        NewSort True, False
+    End If
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdDown_Click (SUB)
+'*******************************************************************************
+Private Sub cmdDown_Click()
+'VBCH    Dim lItem       As Long
+    Dim lCount      As Long
+    Dim bSelected() As Boolean
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    With lstControls
+        If .SelCount = 0 Then
+            Exit Sub
+        End If
+        
+        If .Selected(.ListCount - 1) Then
+            Exit Sub
+        End If
+        
+        ReDim bSelected(.ListCount - 1)
+        
+        For lCount = 0 To .ListCount - 1
+            bSelected(lCount) = .Selected(lCount)
+        Next
+        
+        For lCount = .ListCount - 1 To 0 Step -1
+            If bSelected(lCount) Then
+                lData = .ItemData(lCount)
+                .AddItem .List(lCount), lCount + 2
+                .ItemData(.NewIndex) = lData
+                .RemoveItem lCount
+            End If
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            .Selected(lCount) = False
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                .Selected(lCount + 1) = True
+            End If
+        Next
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' cmdDownAcross_Click (SUB)
+'*******************************************************************************
+Private Sub cmdDownAcross_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdDownAcross_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    If chkGroup.value = vbChecked Then
+        NewSort False, True
+    Else
+        NewSort False, False
+    End If
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdOK_Click (SUB)
+'*******************************************************************************
+Private Sub cmdOK_Click()
+    Dim lCount          As Long
+    Dim sName           As String
+    Dim lIndex          As Long
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdOK_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    Screen.MousePointer = vbHourglass
+    
+    For lCount = 0 To lstControls.ListCount - 1
+        GetNameAndIndex lstControls.List(lCount), sName, lIndex
+        
+        If lIndex >= 0 Then
+            m_CurrentForm.Designer.VBControls.Item(sName, lIndex).Properties("TabIndex") = lCount
+        Else
+            m_CurrentForm.Designer.VBControls.Item(sName).Properties("TabIndex") = lCount
+        End If
+    Next
+    Screen.MousePointer = vbDefault
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    Screen.MousePointer = vbDefault
+    
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdRefresh_Click (SUB)
+'*******************************************************************************
+Private Sub cmdRefresh_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "cmdRefresh_Click"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    RefreshList REFRESHCTLS
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdUp_Click (SUB)
+'*******************************************************************************
+Private Sub cmdUp_Click()
+'VBCH    Dim lItem       As Long
+    Dim lCount      As Long
+    Dim bSelected() As Boolean
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    With lstControls
+    
+        If .SelCount = 0 Then
+            Exit Sub
+        End If
+        
+        If .Selected(0) Then
+            Exit Sub
+        End If
+        
+        ReDim bSelected(.ListCount - 1)
+        
+        For lCount = 0 To .ListCount - 1
+            bSelected(lCount) = .Selected(lCount)
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                lData = .ItemData(lCount)
+                .AddItem .List(lCount), lCount - 1
+                .ItemData(.NewIndex) = lData
+                .RemoveItem lCount + 1
+            End If
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            .Selected(lCount) = False
+        Next
+        
+        For lCount = 0 To .ListCount - 1
+            If bSelected(lCount) Then
+                .Selected(lCount - 1) = True
+            End If
+        Next
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ControlAdded (SUB)
+'*******************************************************************************
+Public Sub ControlAdded(ctl As VBControl)
+    Dim lCount As Long
+    
+    On Error Resume Next
+    
+    Err.Clear
+    lCount = ctl.Properties("TabIndex")
+    If Err.Number <> 0 Then
+        Err.Clear
+        Exit Sub
+    End If
+    
+    lstControls.AddItem ControlName(ctl)
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ControlName (FUNCTION)
+'*******************************************************************************
+Private Function ControlName(ctl As VBIDE.VBControl) As String
+    Dim sTemp       As String
+    Dim sCaption    As String
+    Dim lIndex      As Long
+    Dim sName       As String
+    Dim oTemp       As VBIDE.VBControl
+    Dim bDone       As Boolean
+    
+    On Error Resume Next
+    
+    Set oTemp = ctl
+    bDone = False
+    sTemp = ""
+    
+    Do
+        sName = oTemp.Properties("Name")
+        lIndex = oTemp.Properties("Index")
+        
+        If sTemp = "" Then
+            If lIndex >= 0 Then
+                sTemp = sName & "(" & lIndex & ")"
+            Else
+                sTemp = sName
+            End If
+        Else
+            If lIndex >= 0 Then
+                sTemp = sName & "(" & lIndex & ")." & sTemp
+            Else
+                sTemp = sName & "." & sTemp
+            End If
+        End If
+            
+        If TypeOf oTemp.Container Is VBControl Then
+            Set oTemp = oTemp.Container
+        Else
+            bDone = True
+        End If
+    Loop Until bDone
+
+    If TextWidth(sTemp & "WWW") > m_lMinWidth Then
+        m_lMinWidth = TextWidth(sTemp & "WWW")
+    End If
+
+    sCaption = ctl.Properties("Caption")
+    If sCaption = "" Then
+        sCaption = ctl.Properties("Text")
+    End If
+
+    If TextWidth(sCaption & "WWW") > m_lMinWidth1 Then
+        m_lMinWidth1 = TextWidth(sCaption & "WWW")
+    End If
+
+    If Len(sCaption) > 0 Then
+        ControlName = sTemp & vbTab & "'" & sCaption & "'"
+    Else
+        ControlName = sTemp
+    End If
+
+    Err.Clear
+End Function
+
+'*******************************************************************************
+' ControlRemoved (SUB)
+'*******************************************************************************
+Public Sub ControlRemoved(ctl As VBControl)
+    Dim sTemp   As String
+    Dim lCount  As Long
+    
+    On Error Resume Next
+    
+    sTemp = ControlName(ctl)
+    For lCount = 0 To lstControls.ListCount - 1
+        If lstControls.List(lCount) = sTemp Then
+            lstControls.RemoveItem lCount
+            Exit Sub
+        End If
+    Next
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' ControlRenamed (SUB)
+'*******************************************************************************
+Public Sub ControlRenamed(ctl As VBControl, sOldName As String, lOldIndex As Long)
+    Dim sTemp   As String
+    Dim lCount  As Long
+    Dim lData   As Long
+    
+    On Error Resume Next
+    
+    If lOldIndex >= 0 Then
+        sOldName = sOldName & "(" & lOldIndex & ")"
+    End If
+    
+    sTemp = ControlName(ctl)
+    
+    With lstControls
+        For lCount = 0 To .ListCount - 1
+            If Left(.List(lCount), Len(sOldName)) = sOldName Then
+                lData = .ItemData(lCount)
+                .RemoveItem lCount
+                .AddItem sTemp, lCount
+                .ItemData(.NewIndex) = lData
+                Exit Sub
+            End If
+        Next
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' GetNameAndIndex (SUB)
+'*******************************************************************************
+Private Sub GetNameAndIndex(sListItem As String, sName As String, lIndex As Long)
+    Dim lPos    As Long
+    Dim lPos2   As Long
+    Dim sTemp   As String
+    
+    On Error Resume Next
+    
+    lPos = InStr(sListItem, vbTab)
+    If lPos > 0 Then
+        sTemp = Left(sListItem, lPos - 1)
+    Else
+        sTemp = sListItem
+    End If
+    
+    lPos = InStrRev(sTemp, ".")
+    If lPos > 0 Then
+        sTemp = Mid(sTemp, lPos + 1)
+    End If
+    
+    lPos = InStr(sTemp, "(")
+    If lPos > 0 Then
+        lPos2 = InStr(sTemp, ")")
+        lIndex = Val(Mid(sTemp, lPos + 1, lPos2 - lPos))
+        sName = Left(sTemp, lPos - 1)
+    Else
+        lIndex = -1
+        sName = sTemp
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' lstControls_DragDrop (SUB)
+'*******************************************************************************
+Private Sub lstControls_DragDrop(Source As Control, x As Single, y As Single)
+    Dim lIndex      As Long
+    Dim sTemp       As String
+    Dim lPos        As Long
+    Dim lData       As Long
+    
+    On Error Resume Next
+    
+    With lstControls
+        lIndex = .ListIndex
+        If lIndex >= 0 Then
+            sTemp = .Text
+            lPos = (y \ TextHeight(sTemp)) + .TopIndex
+
+            If lPos > .ListCount Then
+                lPos = .ListCount
+            End If
+
+            lData = .ItemData(lIndex)
+            .AddItem sTemp, lPos
+            .ItemData(.NewIndex) = lData
+            
+            If lIndex > lPos Then
+                .RemoveItem lIndex + 1
+            Else
+                .RemoveItem lIndex
+            End If
+        End If
+    End With
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' lstControls_MouseMove (SUB)
+'*******************************************************************************
+Private Sub lstControls_MouseMove(Button As Integer, Shift As Integer, x As Single, y As Single)
+    On Error Resume Next
+    
+    If Button = vbLeftButton And Shift = 0 Then
+        lstControls.Drag
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' NewSort (SUB)
+'*******************************************************************************
+Private Sub NewSort(bAccrossAndDown As Boolean, bGroup As Boolean)
+    Dim lCount          As Long
+    Dim sData()         As String
+    Dim lPos            As Long
+    Dim sTemp           As String
+    Dim sName           As String
+    Dim lIndex          As Long
+    Dim lCount2         As Long
+    Dim lLevel          As Long
+    Dim sParent         As String
+    Dim lMaxLevel       As Long
+    Dim sOut()          As String
+    Dim lActioned       As Long
+    Dim lInsert         As Long
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const COL_FULLNAME  As Long = 0
+    Const COL_NAME      As Long = 1
+    Const COL_INDEX     As Long = 2
+    Const COL_TOP       As Long = 3
+    Const COL_LEFT      As Long = 4
+    Const COL_LEVEL     As Long = 5
+    Const COL_PARENT    As Long = 6
+    
+    Const PROCEDURE_NAME As String = "NewSort"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    Screen.MousePointer = vbHourglass
+    
+    With lstControls
+        If .ListCount > 1 Then
+            ReDim sData(.ListCount - 1, 6)
+            ReDim sOut(.ListCount - 1, 6)
+            lMaxLevel = 1
+            
+            For lCount = 0 To .ListCount - 1
+                sTemp = .List(lCount)
+                
+                If InStr(sTemp, vbTab) > 0 Then
+                    sTemp = Left(sTemp, InStr(sTemp, vbTab) - 1)
+                End If
+                
+                ' Fullname
+                sData(lCount, COL_FULLNAME) = sTemp
+                
+                GetNameAndIndex sTemp, sName, lIndex
+                
+                ' Name
+                sData(lCount, COL_NAME) = sName
+                
+                ' Index
+                sData(lCount, COL_INDEX) = lIndex
+                
+                If lIndex >= 0 Then
+                    ' Top
+                    sData(lCount, COL_TOP) = m_Controls(sName, lIndex).Properties("Top")
+                    ' Left
+                    sData(lCount, COL_LEFT) = m_Controls(sName, lIndex).Properties("Left")
+                Else
+                    ' Top
+                    sData(lCount, COL_TOP) = m_Controls(sName).Properties("Top")
+                    ' Left
+                    sData(lCount, COL_LEFT) = m_Controls(sName).Properties("Left")
+                End If
+                
+                lLevel = 1
+                sParent = ""
+                lPos = InStr(sTemp, ".")
+                If lPos > 0 Then
+                    For lCount2 = 1 To Len(sTemp)
+                        If Mid(sTemp, lCount2, 1) = "." Then
+                            lLevel = lLevel + 1
+                            sParent = Left(sTemp, lCount2 - 1)
+                        End If
+                    Next
+                End If
+                
+                If lLevel > lMaxLevel Then
+                    lMaxLevel = lLevel
+                End If
+                
+                ' Level
+                sData(lCount, COL_LEVEL) = lLevel
+                ' Parent
+                sData(lCount, COL_PARENT) = sParent
+            Next
+            
+            ' Now loop through our array sorting level1, then level2 and so on
+            ' Levels are sorted top, then left, according to level, if top, left and level
+            ' are all equal then they are sorted alphabetically
+            ' As there will be few elements we can do a simple shuffle sort.
+            lActioned = 0
+            For lLevel = 1 To lMaxLevel
+            
+                For lCount = LBound(sData, 1) To UBound(sData, 1)
+                
+                    ' if they are in the level we are checking
+                    If sData(lCount, COL_LEVEL) = lLevel Then
+                    
+                        ' First one just gets inserted
+                        If lActioned = 0 Then
+                            sOut(lActioned, COL_FULLNAME) = sData(lCount, COL_FULLNAME)
+                            sOut(lActioned, COL_NAME) = sData(lCount, COL_NAME)
+                            sOut(lActioned, COL_INDEX) = sData(lCount, COL_INDEX)
+                            sOut(lActioned, COL_TOP) = sData(lCount, COL_TOP)
+                            sOut(lActioned, COL_LEFT) = sData(lCount, COL_LEFT)
+                            sOut(lActioned, COL_LEVEL) = sData(lCount, COL_LEVEL)
+                            sOut(lActioned, COL_PARENT) = sData(lCount, COL_PARENT)
+                        Else
+                            ' Now we loop backwards through the output array
+                            ' looking for the right place to drop our data
+                            lInsert = 0
+                            For lCount2 = lActioned - 1 To 0 Step -1
+                                If bGroup Then
+                                    If bAccrossAndDown Then
+                                        ' if they are the same level they need to have the
+                                        ' same parent; if the level is one different, is it
+                                        ' our parent. If neither condition is met we can shuffle,
+                                        ' otherwise we need to test top and left properties
+                                        
+                                        ' Same level and same parent
+                                        If sData(lCount, COL_LEVEL) = sOut(lCount2, COL_LEVEL) And sData(lCount, COL_PARENT) = sOut(lCount2, COL_PARENT) Then
+                                            ' Check the top and left property and either insert here or shuffle and move on
+                                            If Val(sData(lCount, COL_TOP)) > Val(sOut(lCount2, COL_TOP)) Then
+                                                lInsert = lCount2 + 1
+                                                Exit For
+                                            ElseIf Val(sData(lCount, COL_TOP)) = Val(sOut(lCount2, COL_TOP)) Then
+                                                If Val(sData(lCount, COL_LEFT)) > Val(sOut(lCount2, COL_LEFT)) Then
+                                                    lInsert = lCount2 + 1
+                                                    Exit For
+                                                ElseIf Val(sData(lCount, COL_LEFT)) = Val(sOut(lCount2, COL_LEFT)) Then
+                                                    If sData(lCount, COL_FULLNAME) > sOut(lCount2, COL_FULLNAME) Then
+                                                        lInsert = lCount2 + 1
+                                                        Exit For
+                                                    End If
+                                                End If
+                                            End If
+                                            
+                                        ' Child level and this is our parent
+                                        ElseIf CLng(sData(lCount, COL_LEVEL)) - 1 = CLng(sOut(lCount2, COL_LEVEL)) And sData(lCount, COL_PARENT) = sOut(lCount2, COL_FULLNAME) Then
+                                            ' Insert under the parent
+                                            lInsert = lCount2 + 1
+                                            Exit For
+                                        
+                                        End If
+                                        
+                                    ' Down and Across
+                                    Else
+                                        ' if they are the same level they need to have the
+                                        ' same parent; if the level is one different, is it
+                                        ' our parent. If neither condition is met we can shuffle,
+                                        ' otherwise we need to test top and left properties
+                                        
+                                        ' Same level and same parent
+                                        If sData(lCount, COL_LEVEL) = sOut(lCount2, COL_LEVEL) And sData(lCount, COL_PARENT) = sOut(lCount2, COL_PARENT) Then
+                                            ' Check the top and left property and either insert here or shuffle and move on
+                                            If Val(sData(lCount, COL_LEFT)) > Val(sOut(lCount2, COL_LEFT)) Then
+                                                lInsert = lCount2 + 1
+                                                Exit For
+                                            ElseIf Val(sData(lCount, COL_LEFT)) = Val(sOut(lCount2, COL_LEFT)) Then
+                                                If Val(sData(lCount, COL_TOP)) > Val(sOut(lCount2, COL_TOP)) Then
+                                                    lInsert = lCount2 + 1
+                                                    Exit For
+                                                ElseIf Val(sData(lCount, COL_TOP)) = Val(sOut(lCount2, COL_TOP)) Then
+                                                    If sData(lCount, COL_FULLNAME) > sOut(lCount2, COL_FULLNAME) Then
+                                                        lInsert = lCount2 + 1
+                                                        Exit For
+                                                    End If
+                                                End If
+                                            End If
+                                            
+                                        ' Child level and this is our parent
+                                        ElseIf CLng(sData(lCount, COL_LEVEL)) - 1 = CLng(sOut(lCount2, COL_LEVEL)) And sData(lCount, COL_PARENT) = sOut(lCount2, COL_FULLNAME) Then
+                                            ' Insert under the parent
+                                            lInsert = lCount2 + 1
+                                            Exit For
+                                        
+                                        End If
+                                    End If
+                                Else
+                                    If bAccrossAndDown Then
+                                        
+                                        ' Check the top and left property and either insert here or shuffle and move on
+                                        If Val(sData(lCount, COL_TOP)) > Val(sOut(lCount2, COL_TOP)) Then
+                                            lInsert = lCount2 + 1
+                                            Exit For
+                                        ElseIf Val(sData(lCount, COL_TOP)) = Val(sOut(lCount2, COL_TOP)) Then
+                                            If Val(sData(lCount, COL_LEFT)) > Val(sOut(lCount2, COL_LEFT)) Then
+                                                lInsert = lCount2 + 1
+                                                Exit For
+                                            ElseIf Val(sData(lCount, COL_LEFT)) = Val(sOut(lCount2, COL_LEFT)) Then
+                                                If sData(lCount, COL_FULLNAME) > sOut(lCount2, COL_FULLNAME) Then
+                                                    lInsert = lCount2 + 1
+                                                    Exit For
+                                                End If
+                                            End If
+                                        End If
+                                        
+                                    ' Down and Across
+                                    Else
+                                        
+                                        ' Check the top and left property and either insert here or shuffle and move on
+                                        If Val(sData(lCount, COL_LEFT)) > Val(sOut(lCount2, COL_LEFT)) Then
+                                            lInsert = lCount2 + 1
+                                            Exit For
+                                        ElseIf Val(sData(lCount, COL_LEFT)) = Val(sOut(lCount2, COL_LEFT)) Then
+                                            If Val(sData(lCount, COL_TOP)) > Val(sOut(lCount2, COL_TOP)) Then
+                                                lInsert = lCount2 + 1
+                                                Exit For
+                                            ElseIf Val(sData(lCount, COL_TOP)) = Val(sOut(lCount2, COL_TOP)) Then
+                                                If sData(lCount, COL_FULLNAME) > sOut(lCount2, COL_FULLNAME) Then
+                                                    lInsert = lCount2 + 1
+                                                    Exit For
+                                                End If
+                                            End If
+                                        End If
+                                    End If
+                                End If
+                            Next
+                            
+                            For lCount2 = lActioned - 1 To lInsert Step -1
+                                sOut(lCount2 + 1, COL_FULLNAME) = sOut(lCount2, COL_FULLNAME)
+                                sOut(lCount2 + 1, COL_NAME) = sOut(lCount2, COL_NAME)
+                                sOut(lCount2 + 1, COL_INDEX) = sOut(lCount2, COL_INDEX)
+                                sOut(lCount2 + 1, COL_TOP) = sOut(lCount2, COL_TOP)
+                                sOut(lCount2 + 1, COL_LEFT) = sOut(lCount2, COL_LEFT)
+                                sOut(lCount2 + 1, COL_LEVEL) = sOut(lCount2, COL_LEVEL)
+                                sOut(lCount2 + 1, COL_PARENT) = sOut(lCount2, COL_PARENT)
+                            Next
+                            sOut(lInsert, COL_FULLNAME) = sData(lCount, COL_FULLNAME)
+                            sOut(lInsert, COL_NAME) = sData(lCount, COL_NAME)
+                            sOut(lInsert, COL_INDEX) = sData(lCount, COL_INDEX)
+                            sOut(lInsert, COL_TOP) = sData(lCount, COL_TOP)
+                            sOut(lInsert, COL_LEFT) = sData(lCount, COL_LEFT)
+                            sOut(lInsert, COL_LEVEL) = sData(lCount, COL_LEVEL)
+                            sOut(lInsert, COL_PARENT) = sData(lCount, COL_PARENT)
+                        End If
+                        
+                        lActioned = lActioned + 1
+                    End If
+                Next
+            Next
+            
+            m_lMinWidth = 0
+            m_lMinWidth1 = 0
+            ' Now rebuild the listbox
+            lstControls.Clear
+            For lCount = LBound(sOut, 1) To UBound(sOut, 1)
+                If sOut(lCount, COL_INDEX) >= 0 Then
+                    sTemp = ControlName(m_Controls(sOut(lCount, COL_NAME), sOut(lCount, COL_INDEX)))
+                Else
+                    sTemp = ControlName(m_Controls(sOut(lCount, COL_NAME)))
+                End If
+                
+                lstControls.AddItem sTemp
+                lstControls.ItemData(lstControls.NewIndex) = CLng(sOut(lCount, COL_INDEX))
+            Next
+            
+            If m_lMinWidth <> 0 Then
+                SetListTabs
+            End If
+        End If
+    End With
+    
+    Screen.MousePointer = vbDefault
+TIDY_UP:
+    On Error Resume Next
+
+    Screen.MousePointer = vbDefault
+    
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' RefreshList (SUB)
+'*******************************************************************************
+Public Sub RefreshList(iType As Integer)
+    Dim lCount          As Long
+    Dim oControl        As VBControl
+    Dim sTemp           As String
+    Dim lTabIndex       As Long
+'VBCH    Dim sName           As String
+'VBCH    Dim lArrayIndex     As Long
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+'VBCH    Dim lWidth          As Long
+    
+    Const PROCEDURE_NAME As String = "RefreshList"
+    
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+
+    lstControls.Clear
+
+    If m_VBInst.ActiveVBProject Is Nothing Then
+        Exit Sub
+    End If
+
+    If iType = NEWFORM Then
+        If m_CurrentForm Is m_VBInst.SelectedVBComponent Then
+            Exit Sub
+        End If
+    End If
+
+    Set m_CurrentForm = m_VBInst.SelectedVBComponent
+
+    If m_CurrentForm Is Nothing Then
+        Exit Sub
+    End If
+
+    If (m_CurrentForm.Type <> vbext_ct_VBForm) And _
+            (m_CurrentForm.Type <> vbext_ct_UserControl) And _
+            (m_CurrentForm.Type <> vbext_ct_DocObject) And _
+            (m_CurrentForm.Type <> vbext_ct_PropPage) Then
+        Exit Sub
+    End If
+
+    Set m_Controls = m_CurrentForm.Designer.VBControls
+
+    m_lMinWidth = 0
+    m_lMinWidth1 = 0
+    
+    For Each oControl In m_CurrentForm.Designer.VBControls
+        'try to get the tabindex
+        On Error Resume Next
+        lTabIndex = oControl.Properties("TabIndex")
+        
+        If Err.Number <> 0 Then
+            'doesn't have a tabindex
+            Err.Clear
+        Else
+            On Error GoTo ERROR_HANDLER
+    
+            sTemp = ControlName(oControl)
+    
+            'find out where it goes in the list
+            Select Case iType
+                Case NEWFORM, REFRESHCTLS
+                    For lCount = 0 To lstControls.ListCount - 1
+                        If lTabIndex < lstControls.ItemData(lCount) Then
+                            Exit For
+                        End If
+                    Next
+    
+            End Select
+    
+            'add it to the list
+            lstControls.AddItem sTemp, lCount
+            lstControls.ItemData(lstControls.NewIndex) = lTabIndex
+            lstControls.Refresh
+        End If
+    Next
+    
+    If m_lMinWidth <> 0 Then
+        SetListTabs
+    End If
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' SetListTabs (SUB)
+'*******************************************************************************
+Private Sub SetListTabs()
+    Dim lListBoxTabs(0) As Long
+    Dim lResult         As Long
+    Dim dAverageWidth   As Double
+    Dim lMaxWidth       As Long
+
+    Const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    On Error Resume Next
+
+    dAverageWidth = ((TextWidth(alphabet) / 52) / Screen.TwipsPerPixelX)
+
+    'Set the tab stop points.
+    lListBoxTabs(0) = ((m_lMinWidth / Screen.TwipsPerPixelX) / dAverageWidth) * 4
+
+    'Send LB_SETTABSTOPS message to ListBox.
+    lResult = SendMessage(lstControls.hwnd, LB_SETTABSTOPS, _
+        UBound(lListBoxTabs) + 1, _
+        lListBoxTabs(0))
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+    
+    lMaxWidth = (m_lMinWidth + m_lMinWidth1) \ Screen.TwipsPerPixelX
+    
+    lResult = SendMessage(lstControls.hwnd, LB_SETHORIZONTALEXTENT, _
+        lMaxWidth, 0&)
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+End Sub
+
+'*******************************************************************************
+' UserDocument_KeyDown (SUB)
+'*******************************************************************************
+Private Sub UserDocument_KeyDown(KeyCode As Integer, Shift As Integer)
+    On Error Resume Next
+    
+    HandleKeyDown m_VBInst, Me, KeyCode, Shift
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Paint (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Paint()
+    Static s_dWidth  As Double
+    Static s_dHeight As Double
+    Static dWidth  As Double
+    Static dHeight As Double
+    
+    On Error Resume Next
+    
+    dWidth = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    dHeight = UserDocument.ViewportHeight - (lstControls.Top + 50)
+    
+    If dWidth <> s_dWidth And dHeight <> s_dHeight Then
+        s_dWidth = dWidth
+        s_dHeight = dHeight
+        lstControls.Width = dWidth
+        lstControls.Height = dHeight
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Resize (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Resize()
+    On Error Resume Next
+
+    lstControls.Width = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    lstControls.Height = UserDocument.ViewportHeight - (lstControls.Top + 50)
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Show (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Show()
+    On Error Resume Next
+    
+    cmdAcrossDown.ToolTipText = "Auto sort across then down"
+    cmdDownAcross.ToolTipText = "Auto sort down then across"
+    cmdRefresh.ToolTipText = "Refresh list"
+    cmdUp.ToolTipText = "Move control up the tab order"
+    cmdDown.ToolTipText = "Move control down the tab order"
+    cmdOK.ToolTipText = "Apply this tab order"
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' VBInst (PROPERTY SET)
+'*******************************************************************************
+Public Property Set VBInst(oNewValue As Object)
+    Set m_VBInst = oNewValue
+End Property

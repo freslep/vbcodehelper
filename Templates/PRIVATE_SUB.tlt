@@ -1,0 +1,29 @@
+Private Sub SomeProcedureName()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+
+    Const PROCEDURE_NAME As String = "SomeProcedureName"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    '**** Procedure's code (that may result in errors) goes here
+    
+TIDY_UP:
+    On Error Resume Next
+    
+    '**** Place code to tidy up object references here where we don't care about errors
+    
+    ' Re-raise if we found an error
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub

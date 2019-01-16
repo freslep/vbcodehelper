@@ -1,0 +1,675 @@
+VERSION 5.00
+Begin VB.UserDocument docStatistics 
+   ClientHeight    =   2850
+   ClientLeft      =   0
+   ClientTop       =   0
+   ClientWidth     =   7605
+   HScrollSmallChange=   225
+   ScaleHeight     =   2850
+   ScaleWidth      =   7605
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin VB.CommandButton cmdRefresh 
+      Height          =   330
+      Left            =   375
+      MaskColor       =   &H00000080&
+      Picture         =   "docStatistics.dox":0000
+      Style           =   1  'Graphical
+      TabIndex        =   2
+      TabStop         =   0   'False
+      ToolTipText     =   "Refresh"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdCopy 
+      Height          =   330
+      Left            =   45
+      MaskColor       =   &H00000080&
+      Picture         =   "docStatistics.dox":0102
+      Style           =   1  'Graphical
+      TabIndex        =   1
+      TabStop         =   0   'False
+      ToolTipText     =   "Copy"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.ListBox lstControls 
+      DragIcon        =   "docStatistics.dox":0204
+      Height          =   2400
+      Left            =   30
+      TabIndex        =   0
+      Top             =   360
+      Width           =   7485
+   End
+End
+Attribute VB_Name = "docStatistics"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'*******************************************************************************
+' MODULE:       docStatistics
+' FILENAME:     C:\My Code\vb\vbch\Source\docStatistics.dob
+' AUTHOR:       Phil Fresle
+' CREATED:      02-Jul-2001
+' COPYRIGHT:    Copyright 2001 Frez Systems Limited. All Rights Reserved.
+'
+' DESCRIPTION:
+' Stats
+'
+' MODIFICATION HISTORY:
+' 1.0       03-Jul-2001
+'           Phil Fresle
+'           Initial Version
+'*******************************************************************************
+Option Explicit
+
+Private m_VBInst        As VBIDE.VBE
+Private m_CurrentForm   As VBComponent
+Private m_Controls      As VBControls
+Private m_lMinWidth1    As Long
+Private m_lMinWidth2    As Long
+Private m_lMinWidth3    As Long
+Private m_lMinWidth4    As Long
+Private m_lMinWidth5    As Long
+Private m_lMinWidth6    As Long
+Private m_lMinWidth7    As Long
+Private m_lMinWidth8    As Long
+
+Private Const MODULE_NAME As String = "docStatistics"
+
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" _
+    (ByVal hwnd As Long, _
+     ByVal wMsg As Long, _
+     ByVal wParam As Long, _
+     lParam As Any) As Long
+
+Private Const LB_SETTABSTOPS            As Long = &H192
+Private Const LB_SETHORIZONTALEXTENT    As Long = &H194
+
+'*******************************************************************************
+' cmdCopy_Click (SUB)
+'*******************************************************************************
+Private Sub cmdCopy_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim sText           As String
+    Dim lCount          As Long
+    
+    Const PROCEDURE_NAME As String = "cmdCopy_Click"
+
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    sText = ""
+    If lstControls.ListCount > 0 Then
+        With lstControls
+            For lCount = 0 To .ListCount - 1
+                sText = sText & .List(lCount) & vbCrLf
+            Next
+        End With
+        
+        ' Put in clipboard
+        Clipboard.SetText sText
+    End If
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdRefresh_Click (SUB)
+'*******************************************************************************
+Private Sub cmdRefresh_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    Dim bDirty          As Boolean
+    Dim lReply          As Long
+    Dim oProject        As VBProject
+    
+    Const PROCEDURE_NAME As String = "cmdRefresh_Click"
+
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    bDirty = False
+    For Each oProject In m_VBInst.VBProjects
+        If oProject.IsDirty Then
+            bDirty = True
+            Exit For
+        End If
+    Next
+    
+    If bDirty Then
+        lReply = MsgBox("It is recommended that you save the project(s) before" & _
+            " obtaining project statistics, do you want to continue anyway?", _
+            vbQuestion + vbYesNo, App.ProductName)
+        If lReply = vbNo Then
+            Exit Sub
+        End If
+    End If
+    
+    RefreshList
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' RefreshList (SUB)
+'*******************************************************************************
+Public Sub RefreshList()
+    Dim oProject                As VBProject
+    Dim oComponent              As VBComponent
+    Dim lCount                  As Long
+    Dim lCount2                 As Long
+    Dim sModule                 As String
+    Dim sLines()                As String
+    Dim sLine                   As String
+    Dim sSortName               As String
+    Dim sProjectName            As String
+    Dim lComponentType          As vbext_ComponentType
+    Dim sComponentType          As String
+    Dim sComponentName          As String
+    Dim lCodeLines              As Long
+    Dim lCommentLines           As Long
+    Dim lBlankLines             As Long
+    Dim lTotalLines             As Long
+    Dim lProcedures             As Long
+    Dim lControls               As Long
+    Dim lProjectCodeLines       As Long
+    Dim lProjectCommentLines    As Long
+    Dim lProjectBlankLines      As Long
+    Dim lProjectTotalLines      As Long
+    Dim lProjectProcedures      As Long
+    Dim lProjectControls        As Long
+    Dim sDetails()              As String
+    Dim lComponentCount         As Long
+    Dim lProjectCount           As Long
+    Dim lIndex                  As Long
+    Dim lErrNumber              As Long
+    Dim sErrSource              As String
+    Dim sErrDescription         As String
+    Dim bValidType              As Boolean
+    
+    Const PROCEDURE_NAME As String = "RefreshList"
+    
+    On Error GoTo ERROR_HANDLER
+        
+    Screen.MousePointer = vbHourglass
+    
+    lComponentCount = 0
+    
+    lstControls.Clear
+    
+    For Each oProject In m_VBInst.VBProjects
+        sProjectName = oProject.Name
+        lProjectCodeLines = 0
+        lProjectCommentLines = 0
+        lProjectBlankLines = 0
+        lProjectControls = 0
+        lProjectProcedures = 0
+        lProjectTotalLines = 0
+        
+        For Each oComponent In oProject.VBComponents
+            If oComponent Is Me Then
+                Exit For
+            End If
+            
+            lComponentType = 0
+            lTotalLines = 0
+            sModule = ""
+            lCodeLines = 0
+            lCommentLines = 0
+            lBlankLines = 0
+            lControls = 0
+            lProcedures = 0
+                        
+            sComponentName = oComponent.Name
+            
+            lComponentType = oComponent.Type
+            Select Case lComponentType
+                Case vbext_ct_ActiveXDesigner
+                    sComponentType = "ActiveXDesigner"
+                    bValidType = True
+'                    bValidType = False
+                    
+                Case vbext_ct_ClassModule
+                    sComponentType = "ClassModule"
+                    bValidType = True
+                    
+                Case vbext_ct_DocObject
+                    sComponentType = "DocObject"
+                    bValidType = True
+                    
+                Case vbext_ct_MSForm
+                    sComponentType = "MSForm"
+                    bValidType = False
+                    
+                Case vbext_ct_PropPage
+                    sComponentType = "PropPage"
+                    bValidType = True
+                    
+                Case vbext_ct_RelatedDocument
+                    sComponentType = "RelatedDocument"
+                    bValidType = False
+                    If oComponent.FileCount > 0 Then
+                        sComponentName = GetFilenameFromPath(oComponent.FileNames(1))
+                    End If
+                    
+                Case vbext_ct_ResFile
+                    sComponentType = "ResFile"
+                    bValidType = False
+                    If oComponent.FileCount > 0 Then
+                        sComponentName = GetFilenameFromPath(oComponent.FileNames(1))
+                    End If
+                    
+                Case vbext_ct_StdModule
+                    sComponentType = "StdModule"
+                    bValidType = True
+                    
+                Case vbext_ct_UserControl
+                    sComponentType = "UserControl"
+                    bValidType = True
+                    
+                Case vbext_ct_VBForm
+                    sComponentType = "VBForm"
+                    bValidType = True
+                    
+                Case vbext_ct_VBMDIForm
+                    sComponentType = "VBMDIForm"
+                    bValidType = True
+                    
+                Case Else
+                    sComponentType = "Unknown"
+                    bValidType = False
+            End Select
+            
+            If sComponentName = "docStatistics" Then
+                Exit For
+            End If
+            
+            If sComponentName = "" Then
+                sComponentName = "?"
+            End If
+            
+            UserDocument.lstControls.AddItem "Scanning " & sComponentName & "..."
+            UserDocument.lstControls.ListIndex = UserDocument.lstControls.NewIndex
+            UserDocument.lstControls.Refresh
+            
+            If bValidType Then
+                If Not oComponent.CodeModule Is Nothing Then
+                    
+                    lTotalLines = oComponent.CodeModule.CountOfLines
+                
+                    If lTotalLines <> 0 Then
+                        
+                        sModule = oComponent.CodeModule.Lines(1, lTotalLines)
+                        
+                        If sModule <> "" Then
+                            sLines = Split(sModule, vbCrLf)
+                            For lCount = LBound(sLines) To UBound(sLines)
+                                sLine = LTrim(sLines(lCount))
+                                If sLine = "" Then
+                                    lBlankLines = lBlankLines + 1
+                                ElseIf Left(sLine, 1) = "'" Or Left(sLine, 4) = "Rem" Then
+                                    lCommentLines = lCommentLines + 1
+                                Else
+                                    lCodeLines = lCodeLines + 1
+                                End If
+                            Next
+                        End If
+                    End If
+                        
+                    lProcedures = oComponent.CodeModule.Members.Count
+                    
+                    If lComponentType = vbext_ct_DocObject _
+                        Or lComponentType = vbext_ct_UserControl _
+                        Or lComponentType = vbext_ct_VBForm _
+                        Or lComponentType = vbext_ct_VBMDIForm _
+                        Or lComponentType = vbext_ct_PropPage Then
+                        lControls = oComponent.Designer.VBControls.Count
+                    End If
+                End If
+            End If
+            
+            sSortName = Left((sProjectName & String(40, " ")), 40) & _
+                Right("000000" & CStr(CLng(lComponentType)), 6) & _
+                Left((sComponentName & String(40, " ")), 40)
+            
+            lComponentCount = lComponentCount + 1
+            lIndex = lProjectCount + lComponentCount - 1
+            ReDim Preserve sDetails(10, lIndex)
+    
+            sDetails(0, lIndex) = sSortName
+            sDetails(1, lIndex) = sProjectName
+            sDetails(2, lIndex) = sComponentName
+            sDetails(3, lIndex) = sComponentType
+            sDetails(4, lIndex) = lCodeLines
+            sDetails(5, lIndex) = lCommentLines
+            sDetails(6, lIndex) = lBlankLines
+            sDetails(7, lIndex) = lTotalLines
+            sDetails(8, lIndex) = lControls
+            sDetails(9, lIndex) = lProcedures
+            sDetails(10, lIndex) = bValidType
+            
+            lProjectCodeLines = lProjectCodeLines + lCodeLines
+            lProjectCommentLines = lProjectCommentLines + lCommentLines
+            lProjectBlankLines = lProjectBlankLines + lBlankLines
+            lProjectTotalLines = lProjectTotalLines + lTotalLines
+            lProjectControls = lProjectControls + lControls
+            lProjectProcedures = lProjectProcedures + lProcedures
+        Next
+                            
+        lProjectCount = lProjectCount + 1
+        lIndex = lProjectCount + lComponentCount - 1
+        ReDim Preserve sDetails(10, lIndex)
+        
+        sSortName = Left((sProjectName & String(40, " ")), 40) & _
+            "000000" & String(40, " ")
+        
+        sDetails(0, lIndex) = sSortName
+        sDetails(1, lIndex) = sProjectName
+        sDetails(2, lIndex) = ""
+        sDetails(3, lIndex) = "Project"
+        sDetails(4, lIndex) = lProjectCodeLines
+        sDetails(5, lIndex) = lProjectCommentLines
+        sDetails(6, lIndex) = lProjectBlankLines
+        sDetails(7, lIndex) = lProjectTotalLines
+        sDetails(8, lIndex) = lProjectControls
+        sDetails(9, lIndex) = lProjectProcedures
+        sDetails(10, lIndex) = True
+    Next
+                
+    SelectionSort2D sDetails
+    
+    UserDocument.lstControls.Clear
+    
+    UserDocument.lstControls.AddItem "Component Name" & vbTab & _
+        "Component Type" & vbTab & "Lines of Code" & vbTab & _
+        "Comment Lines" & vbTab & "Blank Lines" & vbTab & _
+        "Total Lines" & vbTab & "Number of VB Controls" & vbTab & _
+        "Number of Procedures"
+
+    m_lMinWidth1 = TextWidth("Component Name" & "WW")
+    m_lMinWidth2 = TextWidth("Component Type" & "WW")
+    m_lMinWidth3 = TextWidth("Lines of Code" & "WW")
+    m_lMinWidth4 = TextWidth("Comment Lines" & "WW")
+    m_lMinWidth5 = TextWidth("Blank Lines" & "WW")
+    m_lMinWidth6 = TextWidth("Total Lines" & "WW")
+    m_lMinWidth7 = TextWidth("Number of VB Controls" & "WW")
+    m_lMinWidth8 = TextWidth("Number of Procedures" & "WW")
+    
+    For lCount2 = LBound(sDetails, 2) To UBound(sDetails, 2)
+        If sDetails(2, lCount2) = "" Then
+            If sDetails(3, lCount2) = "Project" Then
+                sLine = sDetails(1, lCount2)
+            Else
+                sLine = sDetails(1, lCount2) & "." & sDetails(3, lCount2)
+            End If
+        Else
+            sLine = sDetails(1, lCount2) & "." & sDetails(2, lCount2)
+        End If
+        
+        If TextWidth(sLine & "WW") > m_lMinWidth1 Then
+            m_lMinWidth1 = TextWidth(sLine & "WW")
+        End If
+        If TextWidth(sDetails(3, lCount2) & "WW") > m_lMinWidth2 Then
+            m_lMinWidth2 = TextWidth(sDetails(3, lCount2) & "WW")
+        End If
+        
+        If sDetails(10, lCount2) = True Then
+            sLine = sLine & vbTab & _
+                sDetails(3, lCount2) & vbTab & sDetails(4, lCount2) & vbTab & _
+                sDetails(5, lCount2) & vbTab & sDetails(6, lCount2) & vbTab & _
+                sDetails(7, lCount2) & vbTab & sDetails(8, lCount2) & vbTab & _
+                sDetails(9, lCount2)
+        Else
+            sLine = sLine & vbTab & _
+                sDetails(3, lCount2) & vbTab & "?" & vbTab & _
+                "?" & vbTab & "?" & vbTab & _
+                "?" & vbTab & "?" & vbTab & _
+                "?"
+        End If
+        
+        UserDocument.lstControls.AddItem sLine
+    Next
+    
+    SetListTabs
+    
+    Screen.MousePointer = vbDefault
+Exit Sub
+TIDY_UP:
+    Screen.MousePointer = vbDefault
+    
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' SelectionSort2D (SUB)
+'*******************************************************************************
+Private Sub SelectionSort2D(ListArray() As String)
+    Dim sSmallest       As String
+    Dim lSmallest       As Long
+    Dim lCount1         As Long
+    Dim lCount2         As Long
+    Dim lMin            As Long
+    Dim lMax            As Long
+    Dim lMin1           As Long
+    Dim lMax1           As Long
+    Dim lCompareType    As Long
+    Dim lOrder          As Long
+    Dim lCount3         As Long
+    Dim sTemp()         As String
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+    
+    Const PROCEDURE_NAME As String = "SelectionSort2D"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    lMin = LBound(ListArray, 2)
+    lMax = UBound(ListArray, 2)
+    
+    lMin1 = LBound(ListArray, 1)
+    lMax1 = UBound(ListArray, 1)
+    
+    ReDim sTemp(lMin1 To lMax1, 0)
+    
+    If lMin = lMax Then
+        Exit Sub
+    End If
+    
+    ' Order Ascending or Descending?
+    lOrder = -1
+    
+    ' Case sensitive search or not?
+    lCompareType = vbTextCompare
+    
+    ' Loop through array swapping the smallest\largest (determined by lOrder)
+    ' item with the current item
+    For lCount1 = lMin To lMax - 1
+        sSmallest = ListArray(lMin1, lCount1)
+        lSmallest = lCount1
+        
+        ' Find the smallest\largest item in the array
+        For lCount2 = lCount1 + 1 To lMax
+            If StrComp(ListArray(lMin1, lCount2), sSmallest, lCompareType) = lOrder Then
+                sSmallest = ListArray(lMin1, lCount2)
+                lSmallest = lCount2
+            End If
+        Next
+        
+        ' Just swap them, even if we are swapping it with itself,
+        ' as it is generally quicker to do this than test first
+        ' each time if we are already the smallest with a
+        ' test like: If lSmallest <> lCount1 Then
+        For lCount3 = lMin1 To lMax1
+            sTemp(lCount3, 0) = ListArray(lCount3, lSmallest)
+            ListArray(lCount3, lSmallest) = ListArray(lCount3, lCount1)
+            ListArray(lCount3, lCount1) = sTemp(lCount3, 0)
+        Next
+    Next
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' SetListTabs (SUB)
+'*******************************************************************************
+Private Sub SetListTabs()
+    Dim lListBoxTabs(6) As Long
+    Dim lResult         As Long
+    Dim dAverageWidth   As Double
+    Dim lMaxWidth       As Long
+    
+    Const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+    On Error Resume Next
+
+    dAverageWidth = ((TextWidth(alphabet) / 52) / Screen.TwipsPerPixelX)
+
+    'Set the tab stop points.
+    lListBoxTabs(0) = ((m_lMinWidth1 / Screen.TwipsPerPixelX) / dAverageWidth) * 4
+    lListBoxTabs(1) = lListBoxTabs(0) + (((m_lMinWidth2 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(2) = lListBoxTabs(1) + (((m_lMinWidth3 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(3) = lListBoxTabs(2) + (((m_lMinWidth4 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(4) = lListBoxTabs(3) + (((m_lMinWidth5 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(5) = lListBoxTabs(4) + (((m_lMinWidth6 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+    lListBoxTabs(6) = lListBoxTabs(5) + (((m_lMinWidth7 / Screen.TwipsPerPixelX) / dAverageWidth) * 4)
+
+    lMaxWidth = (m_lMinWidth1 + m_lMinWidth2 + m_lMinWidth3 + m_lMinWidth4 + m_lMinWidth5 + _
+        m_lMinWidth6 + m_lMinWidth7 + m_lMinWidth8) / Screen.TwipsPerPixelX
+
+    'Send LB_SETTABSTOPS message to ListBox.
+    lResult = SendMessage(lstControls.hwnd, LB_SETTABSTOPS, _
+        UBound(lListBoxTabs) + 1, _
+        lListBoxTabs(0))
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+    
+    lResult = SendMessage(lstControls.hwnd, LB_SETHORIZONTALEXTENT, _
+        lMaxWidth, 0&)
+
+    'Refresh the ListBox control.
+    lstControls.Refresh
+End Sub
+
+'*******************************************************************************
+' UserDocument_KeyDown (SUB)
+'*******************************************************************************
+Private Sub UserDocument_KeyDown(KeyCode As Integer, Shift As Integer)
+    On Error Resume Next
+
+    HandleKeyDown m_VBInst, Me, KeyCode, Shift
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Paint (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Paint()
+    Static s_dWidth  As Double
+    Static s_dHeight As Double
+    Static dWidth  As Double
+    Static dHeight As Double
+    
+    On Error Resume Next
+    
+    dWidth = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    dHeight = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+    
+    If dWidth <> s_dWidth And dHeight <> s_dHeight Then
+        s_dWidth = dWidth
+        s_dHeight = dHeight
+        lstControls.Width = dWidth
+        lstControls.Height = dHeight
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Resize (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Resize()
+    On Error Resume Next
+
+    lstControls.Width = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    lstControls.Height = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Show (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Show()
+    On Error Resume Next
+
+    cmdCopy.ToolTipText = "Copy to clipboard"
+    cmdRefresh.ToolTipText = "Refresh list"
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' VBInst (PROPERTY SET)
+'*******************************************************************************
+Public Property Set VBInst(oNewValue As Object)
+    Set m_VBInst = oNewValue
+End Property

@@ -1,0 +1,29 @@
+:Base VBCodeHelper.hlp>main
+:Title VBCodeHelper
+1 Overview
+2 Introduction=introduction
+1 Add-In Functions
+2 Document Entire Module=documentmodule
+2 Document Procedure=documentprocedure
+2 Insert Time Stamp=inserttimestamp
+2 Insert Template=inserttemplate
+2 Close Windows=closewindows
+2 Clear Immediate Window=clearimmediatewindow
+2 Insert Error Handler 1, 2 or Error Handle all Procedures=inserterrorhandler
+2 Clean Variables=CleanVariables
+2 Smart Indent=SmartIndent
+2 Smart Tab Order=SmartTabOrder
+2 ZOrder Management=ZOrder
+2 Project Statistics=Statistics
+2 Tidy White Space=TidyWhiteSpace
+2 Procedure List=ProcedureList
+1 Tokens
+2 Standard Token List=tokenlist
+2 User Defined Tokens=userdefined
+1 Configuration Tool
+2 Configuration Tool=configure
+2 Register Licence=register
+1 FAQs
+2 Frequently Asked Questions=faqs
+1 Installation
+2 Installation=installation

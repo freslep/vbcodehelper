@@ -1,0 +1,372 @@
+VERSION 5.00
+Begin VB.UserDocument docTemplates 
+   ClientHeight    =   2850
+   ClientLeft      =   0
+   ClientTop       =   0
+   ClientWidth     =   7605
+   HScrollSmallChange=   225
+   ScaleHeight     =   2850
+   ScaleWidth      =   7605
+   ScrollBars      =   0  'None
+   VScrollSmallChange=   225
+   Begin VB.CommandButton cmdRefresh 
+      Height          =   330
+      Left            =   1695
+      MaskColor       =   &H00000080&
+      Picture         =   "docTemplates.dox":0000
+      Style           =   1  'Graphical
+      TabIndex        =   2
+      TabStop         =   0   'False
+      ToolTipText     =   "Refresh"
+      Top             =   15
+      UseMaskColor    =   -1  'True
+      Width           =   330
+   End
+   Begin VB.CommandButton cmdInsert 
+      Caption         =   "Insert Template"
+      Height          =   330
+      Left            =   45
+      TabIndex        =   1
+      TabStop         =   0   'False
+      Top             =   15
+      Width           =   1650
+   End
+   Begin VB.ListBox lstControls 
+      DragIcon        =   "docTemplates.dox":0102
+      Height          =   2400
+      Left            =   30
+      TabIndex        =   0
+      Top             =   360
+      Width           =   7485
+   End
+End
+Attribute VB_Name = "docTemplates"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'*******************************************************************************
+' MODULE:       docTemplates
+' FILENAME:     C:\My Code\vb\vbch\Source\docTemplates.dob
+' AUTHOR:       Phil Fresle
+' CREATED:      02-Jul-2001
+' COPYRIGHT:    Copyright 2001 Frez Systems Limited. All Rights Reserved.
+'
+' DESCRIPTION:
+' Templates
+'
+' MODIFICATION HISTORY:
+' 1.0       03-Jul-2001
+'           Phil Fresle
+'           Initial Version
+'*******************************************************************************
+Option Explicit
+
+Private m_VBInst        As VBIDE.VBE
+Private m_sTemplatePath As String
+Private m_lMinWidth     As Long
+
+Private Const MODULE_NAME As String = "docTemplates"
+
+Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" _
+    (ByVal hwnd As Long, _
+     ByVal wMsg As Long, _
+     ByVal wParam As Long, _
+     lParam As Any) As Long
+
+Private Const LB_SETHORIZONTALEXTENT    As Long = &H194
+
+'*******************************************************************************
+' cmdInsert_Click (SUB)
+'*******************************************************************************
+Private Sub cmdInsert_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+'VBCH    Dim sText           As String
+'VBCH    Dim lCount          As Long
+    
+    Const PROCEDURE_NAME As String = "cmdInsert_Click"
+
+    On Error GoTo ERROR_HANDLER
+    
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    With lstControls
+        If .ListIndex >= 0 Then
+            If Right(m_sTemplatePath, 1) = "\" Then
+                InsertTemplate m_sTemplatePath & .List(.ListIndex)
+            Else
+                InsertTemplate m_sTemplatePath & "\" & .List(.ListIndex)
+            End If
+        End If
+    End With
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' cmdRefresh_Click (SUB)
+'*******************************************************************************
+Private Sub cmdRefresh_Click()
+    Dim lErrNumber      As Long
+    Dim sErrSource      As String
+    Dim sErrDescription As String
+'VBCH    Dim bDirty          As Boolean
+'VBCH    Dim lReply          As Long
+'VBCH    Dim oProject        As VBProject
+    
+    Const PROCEDURE_NAME As String = "cmdRefresh_Click"
+
+    On Error GoTo ERROR_HANDLER
+
+    If InRunMode(m_VBInst) Then
+        Exit Sub
+    End If
+    
+    RefreshList
+Exit Sub
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' InsertTemplate (SUB)
+'*******************************************************************************
+Private Sub InsertTemplate(sTemplate As String)
+    Dim sFile                       As String
+    Dim lCurrentLine                As Long
+    Dim lDummy                      As Long
+    Dim oMember                     As Member
+    Dim eptType                     As enumProcedureType
+    Dim lTopLine                    As Long
+    Dim lErrNumber                  As Long
+    Dim sErrSource                  As String
+    Dim sErrDescription             As String
+    Dim sAuthor                     As String
+    Dim sCompany                    As String
+    Dim sInitials                   As String
+    Dim sTimeFormat                 As String
+    Dim sDateFormat                 As String
+    Dim colUserTags                 As Collection
+    Dim bDocumentBeforeProcedure    As Boolean
+    Dim bCloseActive                As Boolean
+    Dim lEndDecLine                 As Long
+    
+    Const PROCEDURE_NAME As String = "InsertTemplate"
+    
+    On Error GoTo ERROR_HANDLER
+    
+    If m_VBInst.ActiveCodePane Is Nothing Then
+        MsgBox "A code pane must be selected first", _
+            vbCritical, App.ProductName
+    Else
+        If sTemplate <> "" Then
+            sFile = GetFileContents(sTemplate)
+            
+            If sFile <> "" Then
+                With m_VBInst.ActiveCodePane
+                    ' Find out where the cursor is at the moment
+                    .GetSelection lCurrentLine, lDummy, lDummy, lDummy
+                    
+                    GetOtherTags sAuthor, sCompany, sInitials, sTimeFormat, sDateFormat, bDocumentBeforeProcedure, bCloseActive
+                    GetUserTags colUserTags
+                    
+                    GetProcedureDetails m_VBInst, lCurrentLine, oMember, eptType, lTopLine, lEndDecLine
+                    ReplaceProcedureTags sFile, eptType, oMember
+                    ReplaceTags m_VBInst, sFile, sAuthor, sCompany, sDateFormat, sTimeFormat, sInitials, colUserTags
+                
+                    ' Insert the template
+                    .CodeModule.InsertLines lCurrentLine, sFile
+                End With
+            End If
+        End If
+    End If
+TIDY_UP:
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        On Error GoTo 0
+        Err.Raise lErrNumber, sErrSource, sErrDescription
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' RefreshList (SUB)
+'*******************************************************************************
+Public Sub RefreshList()
+    Dim lErrNumber              As Long
+    Dim sErrSource              As String
+    Dim sErrDescription         As String
+    Dim sPattern                As String
+    Dim sTemplatesPath          As String
+    Dim sFilename               As String
+    Dim sFiles()                As String
+    Dim lFileCount              As Long
+    Dim sSearch                 As String
+    Dim lCount                  As Long
+    
+    Const PROCEDURE_NAME As String = "RefreshList"
+    
+    On Error GoTo ERROR_HANDLER
+        
+    Screen.MousePointer = vbHourglass
+    
+    m_lMinWidth = 0
+    
+    sPattern = "*.tlt"
+    
+    sTemplatesPath = App.Path
+    If Right(sTemplatesPath, 1) = "\" Then
+        sTemplatesPath = sTemplatesPath & "Templates"
+    Else
+        sTemplatesPath = sTemplatesPath & "\Templates"
+    End If
+    
+    m_sTemplatePath = Trim(GetSetting(REG_APP_NAME, REG_SETTINGS, REG_TEMPLATES, sTemplatesPath))
+    
+    If Right(m_sTemplatePath, 1) = "\" Then
+        sSearch = m_sTemplatePath & sPattern
+    Else
+        sSearch = m_sTemplatePath & "\" & sPattern
+    End If
+    
+    lFileCount = 0
+    sFilename = Dir(sSearch, vbNormal Or vbHidden Or vbSystem Or vbReadOnly)
+    Do While Len(sFilename) <> 0
+        ReDim Preserve sFiles(lFileCount)
+        sFiles(lFileCount) = sFilename
+        lFileCount = lFileCount + 1
+        sFilename = Dir()
+    Loop
+
+    lstControls.Clear
+    
+    If lFileCount > 0 Then
+        SelectionSortStrings sFiles, True, False
+    
+        For lCount = LBound(sFiles) To UBound(sFiles)
+            lstControls.AddItem sFiles(lCount)
+            
+            If TextWidth(sFiles(lCount) & "WWW") > m_lMinWidth Then
+                m_lMinWidth = TextWidth(sFiles(lCount) & "WWW")
+            End If
+        Next
+    End If
+    
+    m_lMinWidth = m_lMinWidth \ Screen.TwipsPerPixelX
+    
+    SendMessage lstControls.hwnd, LB_SETHORIZONTALEXTENT, m_lMinWidth, 0&
+    
+    Screen.MousePointer = vbDefault
+Exit Sub
+TIDY_UP:
+    Screen.MousePointer = vbDefault
+    
+    On Error Resume Next
+
+    If lErrNumber <> 0 Then
+        ShowUnexpectedError lErrNumber, sErrDescription, sErrSource
+    End If
+Exit Sub
+ERROR_HANDLER:
+    lErrNumber = Err.Number
+    sErrDescription = Err.Description
+    sErrSource = FormatErrorSource(Err.Source, MODULE_NAME, PROCEDURE_NAME)
+    Resume TIDY_UP
+End Sub
+
+'*******************************************************************************
+' UserDocument_KeyDown (SUB)
+'*******************************************************************************
+Private Sub UserDocument_KeyDown(KeyCode As Integer, Shift As Integer)
+    On Error Resume Next
+
+    HandleKeyDown m_VBInst, Me, KeyCode, Shift
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Paint (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Paint()
+    Static s_dWidth  As Double
+    Static s_dHeight As Double
+    Static dWidth  As Double
+    Static dHeight As Double
+    
+    On Error Resume Next
+    
+    dWidth = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    dHeight = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+    
+    If dWidth <> s_dWidth And dHeight <> s_dHeight Then
+        s_dWidth = dWidth
+        s_dHeight = dHeight
+        lstControls.Width = dWidth
+        lstControls.Height = dHeight
+    End If
+    
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Resize (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Resize()
+    On Error Resume Next
+
+    lstControls.Width = UserDocument.ViewportWidth - (lstControls.Left * 2)
+    lstControls.Height = UserDocument.ViewportHeight - (cmdRefresh.Height + 100)
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' UserDocument_Show (SUB)
+'*******************************************************************************
+Private Sub UserDocument_Show()
+    On Error Resume Next
+
+    cmdInsert.ToolTipText = "Insert Template"
+    cmdRefresh.ToolTipText = "Refresh list"
+
+    Err.Clear
+End Sub
+
+'*******************************************************************************
+' VBInst (PROPERTY SET)
+'*******************************************************************************
+Public Property Set VBInst(oNewValue As Object)
+    Set m_VBInst = oNewValue
+End Property
